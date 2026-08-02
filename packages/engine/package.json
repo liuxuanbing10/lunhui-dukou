@@ -1,0 +1,11 @@
+{
+  "name": "@lunhui/engine",
+  "version": "0.1.0",
+  "private": true,
+  "description": "轮回渡口 - AI 生成引擎（骨架预设 + 血肉生成 + 因果回流）",
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "build": "echo 'engine: no build yet'"
+  }
+}

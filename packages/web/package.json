@@ -1,0 +1,11 @@
+{
+  "name": "@lunhui/web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "轮回渡口 - React 演出层（五件套）",
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "build": "echo 'web: no build yet'"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "@lunhui/server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "轮回渡口 - Fastify API（审问/轮回/记忆）",
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "build": "echo 'server: no build yet'"
+  }
+}
