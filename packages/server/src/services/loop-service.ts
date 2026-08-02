@@ -74,11 +74,29 @@ function rowToResident(row: Record<string, unknown>): Resident {
 /** 开场白（Phase 1 第一夜，见 PHASE1_STORY.md） */
 const INTRO = '雨夜。你从水里醒来。8 个人站在岸边，等你摆渡。你数了两次：9 个。再数，8 个。没人承认多出来的那个是谁。';
 
-/** 保守 fallback（未命中真相表时，先不调 LLM；返回结构化结果标记 usedLlm=false） */
+/** 剧情引导 fallback（未命中真相表时）
+ * Phase 1 第一夜引导（PHASE1_STORY.md）：玩家问"多出来的是谁/第9个"时，
+ * 非蓑衣人给指向蓑衣人的线索，把玩家引向核心审问对象。
+ */
 async function conservativeFallback(
   question: string,
   resident: Resident,
 ): Promise<{ text: string; usedLlm: false }> {
+  // 引导问题：谁是第 9 个 / 多出来的是谁 / 船上的人
+  const guidePattern = /第9个|第九个|多出来|多了一个|船上|9个|九个人|人数/;
+  if (guidePattern.test(question) && resident.id !== 'r1') {
+    const hints: Record<string, string> = {
+      r2: '（阿岚低头摆弄白花，声音轻了：石阶上……那个位置，是给没等到的人的。她没看你，但她的目光往渡口扫了一下。）',
+      r3: '（老王擦着碗，看了一眼门外：那个人……我不认识，但总想给他添碗面。他顿了顿：他去渡口了。）',
+      r4: '（阿黎缩了缩脖子，小声说：渡口……渡口那个人，夜里也在。他不敢看门口。）',
+      r5: '（何叔头也不抬，继续调钟：3:17。水岸交界的时候，他在渡口。齿轮咔嗒一声。）',
+      r6: '（老鲞嗓门大，但这次压低了：那个穿蓑衣的？他不是人。他笑了笑：但他总在渡口。）',
+      r7: '（郑爷提灯照了照你，只说了一个字：别问。灯往渡口方向偏了偏。）',
+      r8: '（小满抱着布包，静静看着你：那个人是最苦的。他捞了七次。每次都不记得他。）',
+    };
+    return { text: hints[resident.id] ?? '（他看了你一眼，指了指渡口的方向。）', usedLlm: false };
+  }
+
   const patterns: Array<{ re: RegExp; reply: string }> = [
     { re: /你是谁|你到底是什么/i, reply: '（他沉默地看着你，没有回答。）' },
     { re: /渡口是什么|这是哪里|我在哪/i, reply: '（雨声很大。他没有回答。）' },

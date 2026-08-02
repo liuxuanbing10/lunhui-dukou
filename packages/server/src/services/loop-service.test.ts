@@ -38,6 +38,21 @@ test('审问：未命中 → 保守 fallback（沉默/反问）', async () => {
   assert.ok(res.answer.includes('没有说话') || res.answer.includes('雨还在下'));
 });
 
+test('审问：引导问题 → 指向蓑衣人（Phase1 剧情引导）', async () => {
+  const loop = startNewLoop(db);
+  const res = await askQuestion(loop.loopId, 'r3', '多出来的那个人是谁？', db);
+  assert.equal(res.usedLlm, false);
+  assert.ok(res.answer.includes('渡口'), '老王应指向渡口');
+});
+
+test('审问：问蓑衣人引导问题 → 不给自指线索', async () => {
+  const loop = startNewLoop(db);
+  const res = await askQuestion(loop.loopId, 'r1', '多出来的是谁？', db);
+  // 蓑衣人不该给自己递线索，应走沉默/保守
+  assert.equal(res.usedLlm, false);
+  assert.equal(res.hitFactId, undefined);
+});
+
 test('审问：额度用尽 → NO_QUESTIONS_LEFT', async () => {
   const loop = startNewLoop(db);
   for (let i = 0; i < MAX_QUESTIONS; i++) {
