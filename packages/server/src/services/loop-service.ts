@@ -3,10 +3,11 @@
  *
  * 生命周期：new → asking → choice → ended
  * 额度：每轮回 10 问（server 层强制，不信任前端）
- * 判定：命中真相表 → 纯规则（不调 LLM）；未命中 → fallback（先保守回答，后续接 LLM）
+ * 判定：命中真相表 → 纯规则（不调 LLM）；未命中 → LLM 血肉层（sophnet→deepseek→保守兜底）
  */
 import type { Database } from 'better-sqlite3';
 import { judgeAsk, type Resident } from '@lunhui/engine';
+import { generateAnswer } from './llm-generator.js';
 import {
   addEvent,
   addMemory,
@@ -74,15 +75,16 @@ function rowToResident(row: Record<string, unknown>): Resident {
 /** 开场白（Phase 1 第一夜，见 PHASE1_STORY.md） */
 const INTRO = '雨夜。你从水里醒来。8 个人站在岸边，等你摆渡。你数了两次：9 个。再数，8 个。没人承认多出来的那个是谁。';
 
-/** 剧情引导 fallback（未命中真相表时）
- * Phase 1 第一夜引导（PHASE1_STORY.md）：玩家问"多出来的是谁/第9个"时，
- * 非蓑衣人给指向蓑衣人的线索，把玩家引向核心审问对象。
+/** LLM 血肉层 fallback（未命中真相表时）
+ * 引导问题（"多出来的是谁/第9个"）走预写台词（剧情设计，不烧 LLM）；
+ * 其他问题走 LLM 生成（sophnet→deepseek→保守兜底）。
  */
 async function conservativeFallback(
   question: string,
   resident: Resident,
-): Promise<{ text: string; usedLlm: false }> {
-  // 引导问题：谁是第 9 个 / 多出来的是谁 / 船上的人
+  db: Database,
+): Promise<{ text: string; usedLlm: boolean }> {
+  // 引导问题：谁是第 9 个 / 多出来的是谁 / 船上的人（剧情设计，不走 LLM）
   const guidePattern = /第9个|第九个|多出来|多了一个|船上|9个|九个人|人数/;
   if (guidePattern.test(question) && resident.id !== 'r1') {
     const hints: Record<string, string> = {
@@ -97,14 +99,9 @@ async function conservativeFallback(
     return { text: hints[resident.id] ?? '（他看了你一眼，指了指渡口的方向。）', usedLlm: false };
   }
 
-  const patterns: Array<{ re: RegExp; reply: string }> = [
-    { re: /你是谁|你到底是什么/i, reply: '（他沉默地看着你，没有回答。）' },
-    { re: /渡口是什么|这是哪里|我在哪/i, reply: '（雨声很大。他没有回答。）' },
-  ];
-  for (const p of patterns) {
-    if (p.re.test(question)) return { text: p.reply, usedLlm: false };
-  }
-  return { text: `（${resident.name}看了你一眼，没有说话。雨还在下。）`, usedLlm: false };
+  // 其他问题 → LLM 生成（sophnet 主 → deepseek 备 → 保守兜底）
+  const result = await generateAnswer(resident, question, db);
+  return { text: result.text, usedLlm: result.provider !== 'none' };
 }
 
 /** 开始新轮回 */
@@ -171,8 +168,8 @@ export async function askQuestion(
   }
   const resident = rowToResident(row);
 
-  // 真相表判定（纯规则优先，不烧 LLM）
-  const result = await judgeAsk(question, resident, conservativeFallback);
+  // 真相表判定（纯规则优先，不烧 LLM）；未命中 → LLM 血肉层
+  const result = await judgeAsk(question, resident, (q, r) => conservativeFallback(q, r, db));
 
   addQuestion(
     db,

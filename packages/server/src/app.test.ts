@@ -42,14 +42,15 @@ test('完整链路：开始轮回 → 审问命中 → 额度 → 选择 → 结
   assert.equal(ask.hitFactId, 'f1');
   assert.equal(ask.questionsLeft, 9);
 
-  // 3. 未命中 → 保守回答
+  // 3. 未命中 → LLM 生成（sophnet）
   const ask2 = await app.inject({
     method: 'POST',
     url: '/api/ask',
     payload: { loop_id: loop.loopId, resident_id: 'r2', question: '你喜欢什么花？' },
   });
   assert.equal(ask2.statusCode, 200);
-  assert.equal(ask2.json().usedLlm, false);
+  assert.equal(ask2.json().usedLlm, true);
+  assert.ok(ask2.json().answer.length > 0);
 
   // 4. 未知居民 → 404
   const badRes = await app.inject({

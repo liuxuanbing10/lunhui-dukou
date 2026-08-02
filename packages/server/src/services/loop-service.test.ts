@@ -31,11 +31,13 @@ test('审问：命中真相表 → direct + pause + 额度扣减', async () => {
   assert.equal(res.questionsLeft, MAX_QUESTIONS - 1);
 });
 
-test('审问：未命中 → 保守 fallback（沉默/反问）', async () => {
+test('审问：未命中 → LLM 血肉层生成（sophnet）', async () => {
   const loop = startNewLoop(db);
-  const res = await askQuestion(loop.loopId, 'r1', '今天的雨真大', db);
-  assert.equal(res.usedLlm, false);
-  assert.ok(res.answer.includes('没有说话') || res.answer.includes('雨还在下'));
+  const res = await askQuestion(loop.loopId, 'r1', '你今天看到什么奇怪的事吗？', db);
+  // 接了 LLM 后，未命中走 sophnet 生成（usedLlm=true）
+  assert.equal(res.usedLlm, true);
+  assert.ok(res.answer.length > 0);
+  assert.ok(!res.answer.includes('作为AI') && !res.answer.includes('我是模型'));
 });
 
 test('审问：引导问题 → 指向蓑衣人（Phase1 剧情引导）', async () => {
@@ -48,8 +50,7 @@ test('审问：引导问题 → 指向蓑衣人（Phase1 剧情引导）', async
 test('审问：问蓑衣人引导问题 → 不给自指线索', async () => {
   const loop = startNewLoop(db);
   const res = await askQuestion(loop.loopId, 'r1', '多出来的是谁？', db);
-  // 蓑衣人不该给自己递线索，应走沉默/保守
-  assert.equal(res.usedLlm, false);
+  // 引导问题只对其他居民生效；蓑衣人走 LLM 生成，但不该揭自己底
   assert.equal(res.hitFactId, undefined);
 });
 
