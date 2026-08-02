@@ -30,8 +30,12 @@ lunhui-dukou/
 | 文档 | 内容 | 何时更新 |
 |---|---|---|
 | [docs/SPEC.md](docs/SPEC.md) | 产品全案：世界观/玩法/变现/合规/路线图 | 改产品行为时 |
+| [docs/DECISIONS.md](docs/DECISIONS.md) | 关键决策记录（成本/尺度/语言/形态） | 新增决策时 |
 | [docs/TECHNOLOGY.md](docs/TECHNOLOGY.md) | 技术栈与工具链定稿 | 改技术选型时 |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 运行时架构与数据流 | 改架构时 |
+| [docs/DATA_MODEL.md](docs/DATA_MODEL.md) | 数据模型字段级定义 | 改表结构时 |
+| [docs/API_CONTRACT.md](docs/API_CONTRACT.md) | API 契约（请求/响应/错误码） | 改接口时 |
+| [docs/CONTENT_ASSETS.md](docs/CONTENT_ASSETS.md) | 内容资产规格（人格卡/真相表/判定规则） | 改内容结构时 |
 | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | 开发环境与日常命令 | 改开发流程时 |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | 分支/commit/PR/代码规范 | 改协作流程时 |
 
