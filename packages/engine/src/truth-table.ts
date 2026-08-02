@@ -69,28 +69,37 @@ export function matchFact(question: string, resident: Resident): MatchResult {
   return { matched: false };
 }
 
+/** fallback 回调：返回纯文本（视为 LLM 生成）或结构化结果（可标记 usedLlm=false 省钱） */
+export type AskFallback = (
+  q: string,
+  r: Resident,
+) => Promise<string | { text: string; usedLlm?: boolean }>;
+
 /**
  * 判定一次审问。
  * @param question 玩家问题
  * @param resident 被审问的居民
- * @param fallback 未命中真相表时，调用方提供的 LLM 生成回调（返回文本）
+ * @param fallback 未命中真相表时，调用方提供的生成回调（LLM 或保守回答）
  * @returns AskResult（对齐 API 契约）
  */
 export async function judgeAsk(
   question: string,
   resident: Resident,
-  fallback?: (q: string, r: Resident) => Promise<string>,
+  fallback?: AskFallback,
 ): Promise<AskResult> {
   const match = matchFact(question, resident);
 
   if (!match.matched) {
-    // 未命中：交给 LLM 生成（如果调用方提供了）；否则给保守回答
+    // 未命中：交给 fallback（调用方提供）。fallback 可返回纯文本（视为 LLM 生成），
+    // 或 { text, usedLlm } 结构（保守回答 usedLlm=false，省钱）
     if (fallback) {
-      const text = await fallback(question, resident);
+      const out = await fallback(question, resident);
+      const text = typeof out === 'string' ? out : out.text;
+      const usedLlm = typeof out === 'string' ? true : (out.usedLlm ?? true);
       return {
         answer: text,
         answerMode: 'rhetoric',
-        usedLlm: true,
+        usedLlm,
         pause: false,
       };
     }
