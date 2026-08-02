@@ -16,21 +16,45 @@
 
 ```
 lunhui-dukou/
-├── docs/SPEC.md            # 完整项目规格（权威文档）
+├── docs/                # 项目宪法（五份权威文档）
 ├── packages/
-│   ├── engine/             # AI 生成引擎（核心）
-│   ├── server/             # Fastify API
-│   └── web/                # React 前端
+│   ├── engine/          # AI 生成引擎（真相表/记忆/关系网/事件）
+│   ├── server/          # Fastify API（审问/轮回/记忆）
+│   └── web/             # React 演出层（五件套）
+├── CONTRIBUTING.md      # 贡献指南
 └── README.md
 ```
 
-## 📜 文档
+## 📜 文档（项目宪法）
 
-- [项目规格说明书](docs/SPEC.md) —— 世界观、玩法、技术架构、变现、合规、路线图
+| 文档 | 内容 | 何时更新 |
+|---|---|---|
+| [docs/SPEC.md](docs/SPEC.md) | 产品全案：世界观/玩法/变现/合规/路线图 | 改产品行为时 |
+| [docs/TECHNOLOGY.md](docs/TECHNOLOGY.md) | 技术栈与工具链定稿 | 改技术选型时 |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 运行时架构与数据流 | 改架构时 |
+| [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | 开发环境与日常命令 | 改开发流程时 |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | 分支/commit/PR/代码规范 | 改协作流程时 |
 
 ## 🛠️ 技术栈
 
-React 19 · Fastify 5 · SQLite · LLM（多 provider 容灾）· ECS + PM2
+TypeScript · React 19 · Fastify 5 · SQLite · LLM 多 provider 容灾 · ECS + PM2
+
+## 🚀 快速开始
+
+```bash
+npm install
+cp .env.example .env   # 填入 LLM API Key
+npm run dev:server     # http://127.0.0.1:8787
+npm run dev:web        # http://127.0.0.1:5173
+```
+
+完整步骤见 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)。
+
+## ✅ 提交前四件套
+
+```bash
+npm run lint && npm run typecheck && npm run test && npm run build
+```
 
 ## 📄 License
 
