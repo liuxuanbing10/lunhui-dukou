@@ -5,7 +5,14 @@
   "description": "轮回渡口 - AI 生成引擎（骨架预设 + 血肉生成 + 因果回流）",
   "type": "module",
   "scripts": {
-    "test": "node --test",
-    "build": "echo 'engine: no build yet'"
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --import tsx --test src/**/*.test.ts",
+    "lint": "eslint src"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
   }
 }

@@ -2,6 +2,7 @@
   "name": "lunhui-dukou",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "description": "轮回渡口 - AI 推理互动叙事（海龟汤 × 狼人杀 × 活小镇）",
   "workspaces": [
     "packages/*"
@@ -10,10 +11,23 @@
     "dev:web": "npm run dev --workspace=@lunhui/web",
     "dev:server": "npm run dev --workspace=@lunhui/server",
     "dev:engine": "npm run dev --workspace=@lunhui/engine",
-    "build": "npm run build --workspaces",
-    "test": "npm run test --workspaces"
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "eslint": "^9.0.0",
+    "eslint-config-prettier": "^9.1.0",
+    "prettier": "^3.3.0",
+    "typescript-eslint": "^8.0.0"
   },
   "engines": {
     "node": ">=20"
+  },
+  "allowScripts": {
+    "esbuild@0.28.1": true,
+    "esbuild@0.25.12": true
   }
 }
