@@ -31,7 +31,7 @@ test('每个居民字段完整（真相表/关系网/人格）', () => {
 
 test('真实角色文件可判定：蓑衣人命中关键事实', () => {
   const dir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../residents');
-  const r1 = parseResidentFile(path.join(dir, 'r1-suoyi.md'));
+  const r1 = parseResidentFile(path.join(dir, 'r1-suoyi', 'SOUL.md'));
   const m = matchFact('你捞过我吗？', r1);
   assert.equal(m.matched, true);
   assert.equal(m.fact?.id, 'f1');
@@ -40,7 +40,7 @@ test('真实角色文件可判定：蓑衣人命中关键事实', () => {
 
 test('真实角色文件可判定：小满命中关键事实', () => {
   const dir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../residents');
-  const r8 = parseResidentFile(path.join(dir, 'r8-xiaoman.md'));
+  const r8 = parseResidentFile(path.join(dir, 'r8-xiaoman', 'SOUL.md'));
   const m = matchFact('你怎么知道我的名字？', r8);
   assert.equal(m.matched, true);
   assert.equal(m.fact?.id, 'f1');

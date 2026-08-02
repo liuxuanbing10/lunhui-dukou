@@ -82,10 +82,13 @@ export function parseResidentFile(filePath: string): Resident {
   };
 }
 
-/** 加载全部居民（按文件名排序，保证 r1..r8 顺序稳定） */
+/** 加载全部居民（扫描 residents 下每个子目录的 SOUL.md，按目录名排序保证 r1..r8 稳定） */
 export function loadAllResidents(): Resident[] {
-  const files = readdirSync(RESIDENTS_DIR).filter((f) => f.endsWith('.md')).sort();
-  return files.map((f) => parseResidentFile(path.join(RESIDENTS_DIR, f)));
+  const dirs = readdirSync(RESIDENTS_DIR, { withFileTypes: true })
+    .filter((d) => d.isDirectory())
+    .map((d) => d.name)
+    .sort();
+  return dirs.map((dir) => parseResidentFile(path.join(RESIDENTS_DIR, dir, 'SOUL.md')));
 }
 
 /** 按 id 查找居民 */
