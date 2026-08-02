@@ -36,6 +36,8 @@ lunhui-dukou/
 | [docs/DATA_MODEL.md](docs/DATA_MODEL.md) | 数据模型字段级定义 | 改表结构时 |
 | [docs/API_CONTRACT.md](docs/API_CONTRACT.md) | API 契约（请求/响应/错误码） | 改接口时 |
 | [docs/CONTENT_ASSETS.md](docs/CONTENT_ASSETS.md) | 内容资产规格（人格卡/真相表/判定规则） | 改内容结构时 |
+| [docs/RESIDENTS.md](docs/RESIDENTS.md) | 8 位居民人格卡（含真相表/关系网） | 改角色时 |
+| [docs/PHASE1_STORY.md](docs/PHASE1_STORY.md) | Phase 1 主线设计（3:17 咬合/玩家身世/第一夜） | 改主线剧情时 |
 | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | 开发环境与日常命令 | 改开发流程时 |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | 分支/commit/PR/代码规范 | 改协作流程时 |
 
