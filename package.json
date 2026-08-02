@@ -1,0 +1,19 @@
+{
+  "name": "lunhui-dukou",
+  "version": "0.1.0",
+  "private": true,
+  "description": "轮回渡口 - AI 推理互动叙事（海龟汤 × 狼人杀 × 活小镇）",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev --workspace=@lunhui/web",
+    "dev:server": "npm run dev --workspace=@lunhui/server",
+    "dev:engine": "npm run dev --workspace=@lunhui/engine",
+    "build": "npm run build --workspaces",
+    "test": "npm run test --workspaces"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
