@@ -24,53 +24,11 @@ function normalize(question: string): string {
     .trim();
 }
 
-/**
- * 每个事实可配置"触发关键词"，用于规则匹配。
- * 词越具体越好；通用词（"你""我"）会导致误命中，禁用。
- */
-const FACT_KEYWORDS: Record<string, string[]> = {
-  // r1 蓑衣人
-  f1_r1: ['捞过', '捞我', '捞了', '7次', '七次', '几次', '多少次'],
-  f2_r1: ['弟弟', '兄弟', '老王', '面馆'],
-  f3_r1: ['涨水', '每年', '为什么来', '来渡口'],
-  // r2 阿岚
-  f1_r2: ['白花', '放花', '渡口放', '给谁', '等谁'],
-  f2_r2: ['未婚夫', '船难', '失踪', '7年前', '七年前'],
-  f3_r2: ['见过我', '上辈子', '认得我', '认识我'],
-  // r3 老王
-  f1_r3: ['多煮', '那碗面', '角落', '给谁'],
-  f2_r3: ['弟弟', '20年前', '二十年', '死', '落水'],
-  f3_r3: ['眼熟', '见过', '哪里见过', '蓑衣'],
-  // r4 阿黎
-  f1_r4: ['纸人', '活', '夜里', '自己走', '走到渡口'],
-  f2_r4: ['还愿', '替', '死者', '上船'],
-  f3_r4: ['师傅', '失踪', '摆渡人', '别给'],
-  // r5 何叔
-  f1_r5: ['重复', '几次', '多少次', '30', '三十', '时间'],
-  f2_r5: ['3:17', '三点十七', '钟停', '落水'],
-  f3_r5: ['记得', '知道', '装', '装不知道'],
-  // r6 老鲞
-  f1_r6: ['船难', '没救', '在岸上', '7年前', '七年前'],
-  f2_r6: ['女儿的鞋', '鞋子', '小孩的鞋', '船舱'],
-  f3_r6: ['捞', '女儿', '出船', '找'],
-  // r7 郑爷
-  f1_r7: ['3:17', '三点十七', '渡口', '等人'],
-  f2_r7: ['妻子', '30年', '三十年', '落水'],
-  f3_r7: ['见过', '从水里', '假装', '没看见'],
-  // r8 小满
-  f1_r8: ['认识我', '我的名字', '每世', '怎么知道'],
-  f2_r8: ['郑爷', '父亲', '妈妈', '孩子', '30年前'],
-  f3_r8: ['第一世', '记得', '摆渡人', '记性'],
-};
-
-/** 需要"沉默/反问"的真相级问题（不能直接揭底） */
-const TRUTH_PROBES = ['你是谁', '你到底是什么', '真相是什么', '这是哪里', '我在哪', '我死了吗', '渡口是什么'];
-
-/** 获取事实的触发关键词 */
-function keywordsFor(fact: Fact, residentId: string): string[] {
-  return FACT_KEYWORDS[`${fact.id}_${residentId}`] ?? FACT_KEYWORDS[fact.id] ?? [];
+/** 获取事实的触发关键词（数据驱动：来自角色文件的 fact.keywords） */
+function keywordsFor(fact: Fact): string[] {
+  return fact.keywords ?? [];
 }
-
+const TRUTH_PROBES = ['你是谁', '你到底是什么', '真相是什么', '这是哪里', '我在哪', '我死了吗', '渡口是什么'];
 
 /**
  * 匹配问题 → 事实。
@@ -89,7 +47,7 @@ export function matchFact(question: string, resident: Resident): MatchResult {
   let bestScore = 0;
   let bestKeyword: string | undefined;
   for (const fact of resident.secretFacts.facts) {
-    const kws = keywordsFor(fact, resident.id);
+    const kws = keywordsFor(fact);
     let score = 0;
     let kwHit: string | undefined;
     for (const kw of kws) {

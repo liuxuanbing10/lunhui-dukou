@@ -9,6 +9,8 @@ export interface Fact {
   statement: string;
   /** 是否关键事实（命中 → pause:true 汤主沉默三秒） */
   isKey: boolean;
+  /** 触发关键词（数据驱动，来自角色文件；用于规则判定，不调 LLM） */
+  keywords?: string[];
 }
 
 /** 居民的真相表（谜底，不可变） */

@@ -16,9 +16,9 @@ const suoyi: Resident = {
   quirks: [],
   secretFacts: {
     facts: [
-      { id: 'f1', statement: '蓑衣人捞过你 7 次', isKey: true },
-      { id: 'f2', statement: '蓑衣人是面馆老王死去的弟弟', isKey: true },
-      { id: 'f3', statement: '蓑衣人每年涨水时来渡口', isKey: false },
+      { id: 'f1', statement: '蓑衣人捞过你 7 次', isKey: true, keywords: ['捞过', '捞我', '7次', '七次'] },
+      { id: 'f2', statement: '蓑衣人是面馆老王死去的弟弟', isKey: true, keywords: ['弟弟', '兄弟', '老王'] },
+      { id: 'f3', statement: '蓑衣人每年涨水时来渡口', isKey: false, keywords: ['涨水', '每年'] },
     ],
     truth: '玩家已经死过 7 次，每次都是蓑衣人捞上来的。',
   },
