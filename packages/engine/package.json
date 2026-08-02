@@ -4,6 +4,12 @@
   "private": true,
   "description": "轮回渡口 - AI 生成引擎（骨架预设 + 血肉生成 + 因果回流）",
   "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",
