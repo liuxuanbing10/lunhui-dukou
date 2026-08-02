@@ -1,1 +1,6 @@
-export const ENGINE_NAME = 'lunhui-engine';
+/**
+ * @lunhui/engine 公共出口
+ * 目前导出：核心类型 + 真相表判定引擎
+ */
+export * from './types.js';
+export * from './truth-table.js';
