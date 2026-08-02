@@ -29,6 +29,7 @@ lunhui-dukou/
 
 | 文档 | 内容 | 何时更新 |
 |---|---|---|
+| [docs/DEV_LOG.md](docs/DEV_LOG.md) | **项目日志（每次开发历程，最新在前）** | 每次开发后追加 |
 | [docs/GAMEPLAY_GUIDE.md](docs/GAMEPLAY_GUIDE.md) | **玩法说明（怎么玩，从零讲起）** | 改玩法时 |
 | [docs/SPEC.md](docs/SPEC.md) | 产品全案：世界观/玩法/变现/合规/路线图 | 改产品行为时 |
 | [docs/DECISIONS.md](docs/DECISIONS.md) | 关键决策记录（成本/尺度/语言/形态） | 新增决策时 |
