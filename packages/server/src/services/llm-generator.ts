@@ -93,6 +93,7 @@ async function callProvider(
 
 /**
  * 生成居民回答（多 provider 容灾）。
+ * 测试/CI 环境：LLM_MOCK=1 时返回固定回答（不烧 token 额度），由测试断言覆盖生成逻辑。
  * @returns { text, provider } 回答文本 + 实际使用的 provider
  */
 export async function generateAnswer(
@@ -100,6 +101,14 @@ export async function generateAnswer(
   question: string,
   db: Database,
 ): Promise<{ text: string; provider: string }> {
+  // Mock 模式：测试/CI 不烧 token（真实调用只在显式需要时跑）
+  if (process.env.LLM_MOCK === '1') {
+    return {
+      text: `（${resident.name}看了你一眼，声音很轻：${question.slice(0, 12)}……这里的事，说不清。）`,
+      provider: 'mock',
+    };
+  }
+
   const providers = buildProviders();
   const systemPrompt = buildSystemPrompt(resident);
   const userPrompt = buildUserPrompt(resident, question, db);

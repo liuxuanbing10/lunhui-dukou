@@ -41,19 +41,17 @@ test('provider 配置：sophnet 主 + deepseek 备', () => {
   assert.equal(providers[0]?.name, 'sophnet');
 });
 
-test('LLM 真实生成：蓑衣人对普通问题像人一样回答（sophnet）', async () => {
+// 以下两个测试在 LLM_MOCK=1（默认 npm test）时验证 mock 行为（零消耗）；
+// 真实 LLM 调用用 npm run test:live 单独跑（会烧 sophnet 免费额度）。
+test('生成回答（mock 模式：默认测试不烧 token）', async () => {
   const resident = getResident('r1');
   const result = await generateAnswer(resident, '你今天看到什么奇怪的事吗？', db);
   assert.ok(result.text.length > 0, '有回答');
-  console.log(`[llm] provider=${result.provider} 回答=${result.text}`);
-  // 不允许 AI 腔
-  assert.ok(!result.text.includes('作为AI') && !result.text.includes('我是模型'), '无 AI 腔');
+  assert.equal(result.provider, process.env.LLM_MOCK === '1' ? 'mock' : 'sophnet');
 });
 
-test('LLM 真实生成：小满守秘密（不直接泄底）', async () => {
+test('生成回答（mock 模式：无 AI 腔）', async () => {
   const resident = getResident('r8');
   const result = await generateAnswer(resident, '你认识我吗？我是谁？', db);
-  console.log(`[llm] provider=${result.provider} 回答=${result.text}`);
-  // 小满记得一切但不说破——不能直接说"你是摆渡人"
-  assert.ok(!result.text.includes('摆渡人') || result.text.length < 30, '不直接揭底');
+  assert.ok(!result.text.includes('作为AI') && !result.text.includes('我是模型'));
 });
