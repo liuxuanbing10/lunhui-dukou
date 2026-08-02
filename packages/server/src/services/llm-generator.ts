@@ -84,7 +84,9 @@ async function callProvider(
       { role: 'user', content: userPrompt },
     ],
     temperature: 0.8,
-    max_tokens: 150,
+    max_tokens: 200,
+    // V4-Flash 默认思考模式会吃掉 max_tokens 导致 content 为空 → 显式关闭（也省钱）
+    ...(provider.name === 'sophnet' ? { thinking: { type: 'disabled' } as const } : {}),
   });
   const text = res.choices[0]?.message?.content?.trim();
   if (!text) throw new Error(`${provider.name}: 空回答`);
