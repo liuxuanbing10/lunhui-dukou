@@ -1,6 +1,6 @@
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import Database from 'better-sqlite3';
+import type Database from 'better-sqlite3';
 import { initDb, closeDb, getDb } from './index.js';
 import { seedResidents } from './seed.js';
 import {

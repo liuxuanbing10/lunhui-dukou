@@ -18,7 +18,6 @@ import {
   getAllResidents,
   getEvents,
   getLoop,
-  getMemories,
   getResidentRow,
   saveWorldState,
 } from '../db/repository.js';

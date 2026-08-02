@@ -1,10 +1,10 @@
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import Database from 'better-sqlite3';
+import type Database from 'better-sqlite3';
 import { initDb, closeDb } from '../db/index.js';
 import { seedResidents } from '../db/seed.js';
 import { startNewLoop, askQuestion, makeChoice, playerMemory, MAX_QUESTIONS } from '../services/loop-service.js';
-import { getLoop, countQuestionsInLoop, getAllResidents } from '../db/repository.js';
+import { getLoop, countQuestionsInLoop } from '../db/repository.js';
 
 let db: Database.Database;
 
