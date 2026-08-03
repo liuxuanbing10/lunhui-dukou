@@ -8,8 +8,8 @@
  * 与 api.ts 同形状（startLoop / ask / choice / memory），便于 api.ts 在无后端时无缝回退。
  * 所有逻辑均为纯数据驱动，无任何网络 / token 消耗。
  */
-import { judgeAsk, type AskResult } from '@lunhui/engine/truth';
-import type { Resident } from '@lunhui/engine/types';
+import { judgeAsk } from '@lunhui/engine/truth';
+import type { AskResult, Resident } from '@lunhui/engine/types';
 import { RESIDENTS } from './residents';
 import { truthData } from './data/truthData.generated';
 import type { AskResponse, ChoiceResponse, LoopResponse, MemoryResponse } from './api';

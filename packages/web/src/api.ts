@@ -5,7 +5,6 @@
  * 自动回退到 offlineClient（零后端 / 零 LLM token 的确定性判定），保证 web 直接可玩。
  */
 import { offlineApi } from './offlineClient';
-import type { AskResponse, ChoiceResponse, LoopResponse, MemoryResponse } from './api';
 
 export interface LoopResponse {
   loopId: number;
