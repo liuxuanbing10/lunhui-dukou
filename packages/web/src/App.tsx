@@ -13,11 +13,14 @@ import { MemoryPhase } from './components/MemoryPhase';
 import './styles.css';
 
 // 视觉主题由 visual/theme 接管（App 注入 CSS 变量，RainNight 改用 theme token）；
-// 音频引擎已接入（createAudioEngine + 用户手势 start + 沉默/命中控制 + 卸载 dispose）；
+// 音频引擎已接入（createAudioEngine({ silenceMs }) + 用户手势 start + 沉默/命中控制 + 卸载 dispose）；
 // 活镇内容已接入（App 用 livingTownResidents 接管居民展示，offlineClient 用 loopEvents/memoryRevenge 驱动叙事）。
 import { RainNight, type RainMode } from './scene/RainNight';
 
 type Phase = 'boot' | 'intro' | 'choice' | 'death' | 'memory';
+
+/** 「沉默三秒」留白时长（ms）：驱动视觉收束窗口，并透传给音频引擎（音频过渡 = SILENCE_MS×0.16） */
+const SILENCE_MS = 2600;
 
 export function App() {
   const [phase, setPhase] = useState<Phase>('boot');
@@ -36,10 +39,11 @@ export function App() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   // 音频引擎：惰性创建、用户手势内 start，卸载时 dispose（测试环境无 AudioContext，全部 no-op）
+  // silenceMs 透传给底层引擎，使其过渡时长跟随 SILENCE_MS 缩放（移动端 3000 / 演出减速 ×1.5→4200）
   const audioRef = useRef<AudioEngine | null>(null);
   const ensureAudio = (): AudioEngine => {
     if (!audioRef.current) {
-      audioRef.current = createAudioEngine();
+      audioRef.current = createAudioEngine({ silenceMs: SILENCE_MS });
       audioRef.current.start();
     }
     return audioRef.current;
@@ -98,7 +102,7 @@ export function App() {
           setSilenceActive(false);
           audio.setSilence(false);
           setPhase('choice');
-        }, 2600);
+        }, SILENCE_MS);
       } else if (res.questionsLeft <= 0) {
         setPhase('choice');
       }
