@@ -9,6 +9,11 @@ import { DeathPhase } from './components/DeathPhase';
 import { MemoryPhase } from './components/MemoryPhase';
 import './styles.css';
 
+// TODO(integrate): 切换为 visual/theme 的 injectThemeVars() 接管 RainNight 的内联配色（冷蓝/汤碗暖光/记忆琥珀）
+// TODO(integrate): 挂载 <AudioLayer/>（来自 audio/*）与 content/livingTown（来自 content/livingTown）
+// 当前离线判定与 2.5D 雨夜场景均不依赖上述尚未产出的模块，可独立运行。
+import { RainNight, type RainMode } from './scene/RainNight';
+
 type Phase = 'boot' | 'intro' | 'choice' | 'death' | 'memory';
 
 export function App() {
@@ -23,6 +28,8 @@ export function App() {
   const [deathLine, setDeathLine] = useState('');
   const [memoryLines, setMemoryLines] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  // 「沉默三秒」留白态：命中关键事实时触发，驱动 RainNight 进入 silence 收束
+  const [silenceActive, setSilenceActive] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const typewriter = useTypewriter(dialogText, 35, phase === 'intro');
@@ -54,9 +61,13 @@ export function App() {
       setDialogText(res.answer);
       setQuestionsLeft(res.questionsLeft);
       setQuestion('');
-      // 命中关键 → 进入选择分支
+      // 命中关键 → 进入「沉默三秒」留白（RainNight silence 收束），再落到选择分支
       if (res.hitFactId && res.pause) {
-        setPhase('choice');
+        setSilenceActive(true);
+        window.setTimeout(() => {
+          setSilenceActive(false);
+          setPhase('choice');
+        }, 2600);
       } else if (res.questionsLeft <= 0) {
         setPhase('choice');
       }
@@ -113,8 +124,12 @@ export function App() {
 
   const showTypewriter = phase === 'intro' || phase === 'memory';
 
+  // RainNight 视觉模式：由当前相位推导（命中关键 → silence 收束；memory 相位 → 记忆叠影；其余 idle）
+  const rainMode: RainMode = silenceActive ? 'silence' : phase === 'memory' ? 'memory' : 'idle';
+
   return (
     <>
+      <RainNight mode={rainMode} />
       <Rain />
       <div className="stage">
         <h1 className="title">轮回渡口</h1>

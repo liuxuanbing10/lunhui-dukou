@@ -29,11 +29,12 @@ body {
 }
 
 /* ---- 雨夜背景 ---- */
+/* 背景改透明：底层 RainNight（R3F 2.5D 画布）透出，DOM 雨丝 / 地平线作为轻量叠层覆盖其上 */
 .rain-scene {
   position: fixed;
   inset: 0;
   overflow: hidden;
-  background: radial-gradient(ellipse at 50% 20%, #101624 0%, #070a10 70%);
+  background: transparent;
   z-index: 0;
 }
 
