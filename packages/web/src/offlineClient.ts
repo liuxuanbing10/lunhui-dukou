@@ -96,10 +96,14 @@ export const offlineApi = {
       if (factEvent) answerText = `${answerText}\n${factEvent.text}`;
     }
 
-    // 命中关键事实 → 累计为「记忆」，供 memory 相位回响
+    // 命中关键事实（pause=true，即 isKey 真相）→ 把当场回答/叙事存入记忆，供 memory 相位回响
     if (result.hitFactId && result.pause) {
       s.memories.push(answerText);
-      // 跨轮回记忆复仇：匹配的 factId 注入记忆回响
+    }
+    // 跨轮回记忆复仇：命中对应 factId 即注入记忆回响。
+    // 注意：解耦于 pause —— isKey=false 的非关键事实（如 r5:f3 / r8:f3）同样承载复仇台词，
+    // 若与 pause 同门控会导致 2/3 复仇台词成为永不可达的死代码（设计意图是「命中即触发」）。
+    if (globalFactId) {
       const revenge = memoryRevenge.find((m) => m.factId === globalFactId);
       if (revenge) s.memories.push(revenge.line);
     }
