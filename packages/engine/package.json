@@ -8,6 +8,15 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./truth": {
+      "types": "./dist/truth.d.ts",
+      "import": "./dist/truth.js",
+      "require": "./dist/truth.js"
+    },
+    "./types": {
+      "types": "./dist/types.d.ts",
+      "import": "./dist/types.js"
     }
   },
   "scripts": {
