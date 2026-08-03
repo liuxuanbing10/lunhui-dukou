@@ -13,6 +13,7 @@
     "lint": "eslint src"
   },
   "dependencies": {
+    "@lunhui/engine": "file:../engine",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
