@@ -18,9 +18,7 @@
     "lint": "eslint src"
   },
   "devDependencies": {
-    "@types/js-yaml": "^4.0.9",
-    "tsx": "^4.19.0",
-    "typescript": "^5.6.0"
+    "@types/js-yaml": "^4.0.9"
   },
   "dependencies": {
     "gray-matter": "^4.0.3",

@@ -6,7 +6,7 @@
  * 判定：命中真相表 → 纯规则（不调 LLM）；未命中 → LLM 血肉层（sophnet→deepseek→保守兜底）
  */
 import type { Database } from 'better-sqlite3';
-import { judgeAsk, type Resident } from '@lunhui/engine';
+import { judgeAsk } from '@lunhui/engine';
 import { generateAnswer } from './llm-generator.js';
 import {
   addEvent,
@@ -18,11 +18,14 @@ import {
   endLoop,
   getAllResidents,
   getEvents,
+  getLatestLoop,
   getLoop,
   getResidentRow,
   saveWorldState,
 } from '../db/repository.js';
 import { getDb } from '../db/index.js';
+import type { EventRow } from '../db/types.js';
+import { rowToResident } from '../utils/row-to-resident.js';
 
 export const MAX_QUESTIONS = 10;
 
@@ -36,7 +39,6 @@ export interface AskOutcome {
   questionsLeft: number;
   residentMood: string;
   loopStatus: string;
-  /** 是否走了 LLM（false = 纯规则判定） */
   usedLlm: boolean;
 }
 
@@ -46,7 +48,7 @@ export interface NewLoopOutcome {
   intro: string;
   questionsLeft: number;
   activeResidents: string[];
-  events: Array<Record<string, unknown>>;
+  events: EventRow[];
 }
 
 export interface ChoiceOutcome {
@@ -55,25 +57,9 @@ export interface ChoiceOutcome {
   loopStatus: string;
 }
 
-/** 把 DB row 转回 engine Resident 类型（用于 judgeAsk） */
-function rowToResident(row: Record<string, unknown>): Resident {
-  return {
-    id: row.id as string,
-    name: row.name as string,
-    archetype: row.archetype as string,
-    age: (row.age as number) ?? 0,
-    role: row.role as string,
-    appearance: (row.appearance as string) ?? '',
-    persona: row.persona as string,
-    speechStyle: (row.speech_style as string) ?? '',
-    quirks: JSON.parse((row.quirks as string) ?? '[]'),
-    secretFacts: JSON.parse(row.secret_facts as string),
-    relations: JSON.parse((row.relations as string) ?? '[]'),
-  };
-}
-
 /** 开场白（Phase 1 第一夜，见 PHASE1_STORY.md） */
-const INTRO = '雨夜。你从水里醒来。8 个人站在岸边，等你摆渡。你数了两次：9 个。再数，8 个。没人承认多出来的那个是谁。';
+const INTRO =
+  '雨夜。你从水里醒来。8 个人站在岸边，等你摆渡。你数了两次：9 个。再数，8 个。没人承认多出来的那个是谁。';
 
 /** LLM 血肉层 fallback（未命中真相表时）
  * 引导问题（"多出来的是谁/第9个"）走预写台词（剧情设计，不烧 LLM）；
@@ -81,7 +67,7 @@ const INTRO = '雨夜。你从水里醒来。8 个人站在岸边，等你摆渡
  */
 async function conservativeFallback(
   question: string,
-  resident: Resident,
+  resident: Parameters<typeof judgeAsk>[1],
   db: Database,
 ): Promise<{ text: string; usedLlm: boolean }> {
   // 引导问题：谁是第 9 个 / 多出来的是谁 / 船上的人（剧情设计，不走 LLM）
@@ -106,20 +92,20 @@ async function conservativeFallback(
 
 /** 开始新轮回 */
 export function startNewLoop(db: Database = getDb()): NewLoopOutcome {
-  const latest = getLoop(db, Number(getLatestLoopId(db)) || 0);
-  const sequence = latest ? (latest.sequence as number) + 1 : 1;
+  const latest = getLatestLoop(db);
+  const sequence = latest ? latest.sequence + 1 : 1;
 
   // 轮回重置：非永久记忆衰减
   if (sequence > 1) decayMemories(db);
 
   const loopId = createLoop(db, sequence);
   const residents = getAllResidents(db);
-  const activeResidents = residents.map((r) => r.id as string);
+  const activeResidents = residents.map((r) => r.id);
 
   // 开场事件
   addEvent(db, loopId, 'plot', INTRO, false, false);
   for (const r of residents.slice(0, 3)) {
-    addEvent(db, loopId, 'ambient', `${r.name as string}在镇上。`, false, false);
+    addEvent(db, loopId, 'ambient', `${r.name}在镇上。`, false, false);
   }
 
   saveWorldState(db, loopId, [], { started: true }, activeResidents);
@@ -132,13 +118,6 @@ export function startNewLoop(db: Database = getDb()): NewLoopOutcome {
     activeResidents,
     events: getEvents(db, loopId),
   };
-}
-
-function getLatestLoopId(db: Database): number {
-  const row = db.prepare('SELECT id FROM loops ORDER BY id DESC LIMIT 1').get() as
-    | { id: number }
-    | undefined;
-  return row?.id ?? 0;
 }
 
 /** 审问（额度 + 真相表判定 + fallback） */
@@ -193,7 +172,7 @@ export async function askQuestion(
   const left = MAX_QUESTIONS - countQuestionsInLoop(db, loopId);
   return {
     loopId,
-    sequence: loop.sequence as number,
+    sequence: loop.sequence,
     answer: result.answer,
     answerMode: result.answerMode,
     hitFactId: result.hitFactId,
@@ -206,7 +185,11 @@ export async function askQuestion(
 }
 
 /** 关键选择（结束轮回） */
-export function makeChoice(loopId: number, choice: string, db: Database = getDb()): ChoiceOutcome {
+export function makeChoice(
+  loopId: number,
+  choice: string,
+  db: Database = getDb(),
+): ChoiceOutcome {
   const loop = getLoop(db, loopId);
   if (!loop) {
     throw new Error('LOOP_NOT_FOUND');
@@ -224,14 +207,17 @@ export function makeChoice(loopId: number, choice: string, db: Database = getDb(
 }
 
 /** 玩家记忆查询 */
-export function playerMemory(db: Database = getDb()): Array<Record<string, unknown>> {
-  // Phase 1：聚合所有居民的强记忆（后续可按玩家视角过滤）
+export function playerMemory(db: Database = getDb()): Array<{
+  content: string;
+  strength: number;
+  loop_id: number | null;
+}> {
   const rows = db
     .prepare(
       `SELECT content, strength, loop_id FROM memories
        WHERE strength >= 0.3 ORDER BY is_permanent DESC, strength DESC LIMIT 20`,
     )
-    .all() as Array<Record<string, unknown>>;
+    .all() as Array<{ content: string; strength: number; loop_id: number | null }>;
   return rows;
 }
 

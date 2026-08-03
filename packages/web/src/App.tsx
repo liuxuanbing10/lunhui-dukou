@@ -1,51 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, type LoopResponse, type AskResponse } from './api';
-import { RESIDENTS, residentName } from './residents';
+import { residentName } from './residents';
+import { useTypewriter } from './hooks/useTypewriter';
+import { Rain } from './components/Rain';
+import { AskingPhase } from './components/AskingPhase';
+import { ChoicePhase } from './components/ChoicePhase';
+import { DeathPhase } from './components/DeathPhase';
+import { MemoryPhase } from './components/MemoryPhase';
 import './styles.css';
 
 type Phase = 'boot' | 'intro' | 'asking' | 'choice' | 'death' | 'memory';
-
-/** 打字机效果 Hook */
-function useTypewriter(text: string, speed = 40, active = true): string {
-  const [shown, setShown] = useState('');
-  useEffect(() => {
-    if (!active) {
-      setShown(text);
-      return;
-    }
-    setShown('');
-    let i = 0;
-    const timer = setInterval(() => {
-      i += 1;
-      setShown(text.slice(0, i));
-      if (i >= text.length) clearInterval(timer);
-    }, speed);
-    return () => clearInterval(timer);
-  }, [text, speed, active]);
-  return shown;
-}
-
-/** 雨滴数组（静态生成一次） */
-const RAIN_DROPS = Array.from({ length: 48 }, (_, i) => ({
-  left: `${(i * 2.08 + 7) % 100}%`,
-  delay: `${(i * 0.37) % 2.8}s`,
-  duration: `${0.7 + ((i * 0.13) % 1.1)}s`,
-}));
-
-function Rain() {
-  return (
-    <div className="rain-scene" aria-hidden>
-      <div className="horizon" />
-      {RAIN_DROPS.map((d, i) => (
-        <div
-          key={i}
-          className="rain-drop"
-          style={{ left: d.left, animationDelay: d.delay, animationDuration: d.duration }}
-        />
-      ))}
-    </div>
-  );
-}
 
 export function App() {
   const [phase, setPhase] = useState<Phase>('boot');
@@ -163,74 +127,47 @@ export function App() {
             {showTypewriter && typewriter.length < dialogText.length && <span className="cursor" />}
           </div>
 
-          {phase === 'intro' && (
-            <>
-              <div className="resident-bar">
-                {loop?.activeResidents.map((id) => (
-                  <button
-                    key={id}
-                    className={`resident-chip${selected === id ? ' selected' : ''}`}
-                    onClick={() => setSelected(id)}
-                  >
-                    {RESIDENTS[id]?.emoji ?? ''} {RESIDENTS[id]?.name ?? id}
-                  </button>
-                ))}
-              </div>
-              <div className="ask-area">
-                <input
-                  ref={inputRef}
-                  className="ask-input"
-                  value={question}
-                  onChange={(e) => setQuestion(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleAsk()}
-                  placeholder="向居民提问…（是/否 类问题最有效）"
-                  autoFocus
-                />
-                <button className="ask-btn" onClick={handleAsk} disabled={busy || !question.trim()}>
-                  问
-                </button>
-              </div>
-              <div className="questions-left">本轮回剩余问题：{questionsLeft} / 10</div>
-            </>
+          {phase === 'intro' && loop && (
+            <AskingPhase
+              residentIds={loop.activeResidents}
+              selected={selected}
+              question={question}
+              questionsLeft={questionsLeft}
+              busy={busy}
+              inputRef={inputRef}
+              onSelect={setSelected}
+              onQuestionChange={setQuestion}
+              onAsk={handleAsk}
+            />
           )}
 
-          {phase === 'choice' && (
-            <>
-              <div className="questions-left" style={{ color: 'var(--danger)', marginTop: 16 }}>
-                水涨了。渡口的船要靠岸。蓑衣人站在河边，看着你。
-              </div>
-              <div className="choice-area">
-                <button className="choice-btn" onClick={() => handleChoice('leave')}>
-                  上船——我想离开这个镇子
-                </button>
-                <button className="choice-btn danger" onClick={() => handleChoice('stay')}>
-                  留下——我得先弄清我是谁
-                </button>
-              </div>
-            </>
+          {phase === 'asking' && loop && (
+            <AskingPhase
+              residentIds={loop.activeResidents}
+              selected={selected}
+              question={question}
+              questionsLeft={questionsLeft}
+              busy={busy}
+              inputRef={inputRef}
+              onSelect={setSelected}
+              onQuestionChange={setQuestion}
+              onAsk={handleAsk}
+            />
           )}
 
-          {phase === 'memory' && memoryLines.length > 0 && (
-            <div className="memory-area">
-              <b>你记得：</b>
-              <br />
-              {memoryLines.map((m, i) => (
-                <div key={i}>{m}</div>
-              ))}
-            </div>
-          )}
+          {phase === 'choice' && <ChoicePhase busy={busy} onChoice={handleChoice} />}
+
+          {phase === 'memory' && <MemoryPhase lines={memoryLines} />}
         </div>
       </div>
 
       {phase === 'death' && (
-        <div className="loop-flash">
-          <h2>轮回</h2>
-          <p>{consequence}</p>
-          <p style={{ marginTop: 12, color: 'var(--danger)' }}>{deathLine}</p>
-          <button className="primary-btn" onClick={handleNextLoop} disabled={busy}>
-            从水里醒来
-          </button>
-        </div>
+        <DeathPhase
+          consequence={consequence}
+          deathLine={deathLine}
+          busy={busy}
+          onNextLoop={handleNextLoop}
+        />
       )}
     </>
   );

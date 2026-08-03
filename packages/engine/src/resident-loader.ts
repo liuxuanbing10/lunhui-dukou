@@ -25,6 +25,9 @@ import type { Fact, Relation, Resident } from './types.js';
 /** 角色文件目录（engine/residents/，src 外，构建后可随包分发） */
 const RESIDENTS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../residents');
 
+/** 模块级缓存：避免每次全量读文件系统 */
+let residentCache: Resident[] | null = null;
+
 /** 从正文中提取指定标题下的 JSON 代码块 */
 function extractJsonBlock(markdown: string, heading: string): string | undefined {
   // 匹配：## Heading 之后第一个 ```json ... ``` 块
@@ -84,11 +87,18 @@ export function parseResidentFile(filePath: string): Resident {
 
 /** 加载全部居民（扫描 residents 下每个子目录的 SOUL.md，按目录名排序保证 r1..r8 稳定） */
 export function loadAllResidents(): Resident[] {
+  if (residentCache) return residentCache;
   const dirs = readdirSync(RESIDENTS_DIR, { withFileTypes: true })
     .filter((d) => d.isDirectory())
     .map((d) => d.name)
     .sort();
-  return dirs.map((dir) => parseResidentFile(path.join(RESIDENTS_DIR, dir, 'SOUL.md')));
+  residentCache = dirs.map((dir) => parseResidentFile(path.join(RESIDENTS_DIR, dir, 'SOUL.md')));
+  return residentCache;
+}
+
+/** 清空居民缓存（测试/热更新用） */
+export function clearResidentCache(): void {
+  residentCache = null;
 }
 
 /** 按 id 查找居民 */

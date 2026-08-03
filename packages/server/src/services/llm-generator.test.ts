@@ -5,6 +5,7 @@ import { initDb, closeDb } from '../db/index.js';
 import { seedResidents } from '../db/seed.js';
 import { getResidentRow } from '../db/repository.js';
 import { generateAnswer, buildProviders } from './llm-generator.js';
+import { rowToResident } from '../utils/row-to-resident.js';
 import type { Resident } from '@lunhui/engine';
 
 let db: Database.Database;
@@ -19,20 +20,9 @@ test.after(() => {
 });
 
 function getResident(id: string): Resident {
-  const row = getResidentRow(db, id) as Record<string, unknown>;
-  return {
-    id: row.id as string,
-    name: row.name as string,
-    archetype: row.archetype as string,
-    age: (row.age as number) ?? 0,
-    role: row.role as string,
-    appearance: (row.appearance as string) ?? '',
-    persona: row.persona as string,
-    speechStyle: (row.speech_style as string) ?? '',
-    quirks: JSON.parse((row.quirks as string) ?? '[]'),
-    secretFacts: JSON.parse(row.secret_facts as string),
-    relations: JSON.parse((row.relations as string) ?? '[]'),
-  };
+  const row = getResidentRow(db, id);
+  if (!row) throw new Error(`Resident ${id} not found`);
+  return rowToResident(row);
 }
 
 test('provider 配置：sophnet 主 + deepseek 备', () => {

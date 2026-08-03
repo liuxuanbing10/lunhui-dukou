@@ -1,8 +1,15 @@
 /**
  * Repository：六表数据访问层（对齐 docs/DATA_MODEL.md）
+ * 强类型：所有返回值使用 db/types.ts 中的 Row 接口，消除 Record<string, unknown>。
  */
 import type { Database } from 'better-sqlite3';
 import type { Resident } from '@lunhui/engine';
+import type {
+  EventRow,
+  LoopRow,
+  MemoryRow,
+  ResidentRow,
+} from './types.js';
 import { getDb } from './index.js';
 
 // ---------- residents ----------
@@ -28,35 +35,37 @@ export function upsertResident(db: Database, r: Resident): void {
   });
 }
 
-export function getAllResidents(db: Database): Array<Record<string, unknown>> {
-  return db.prepare('SELECT * FROM residents WHERE is_active = 1 ORDER BY id').all() as Array<
-    Record<string, unknown>
-  >;
+export function getAllResidents(db: Database): ResidentRow[] {
+  return db
+    .prepare('SELECT * FROM residents WHERE is_active = 1 ORDER BY id')
+    .all() as ResidentRow[];
 }
 
-export function getResidentRow(db: Database, id: string): Record<string, unknown> | undefined {
-  return db.prepare('SELECT * FROM residents WHERE id = ?').get(id) as
-    | Record<string, unknown>
-    | undefined;
+export function getResidentRow(db: Database, id: string): ResidentRow | undefined {
+  return db
+    .prepare('SELECT * FROM residents WHERE id = ?')
+    .get(id) as ResidentRow | undefined;
 }
 
 // ---------- loops ----------
 
 export function createLoop(db: Database, sequence: number): number {
-  const info = db.prepare('INSERT INTO loops (sequence, status) VALUES (?, ?)').run(sequence, 'active');
+  const info = db
+    .prepare('INSERT INTO loops (sequence, status) VALUES (?, ?)')
+    .run(sequence, 'active');
   return Number(info.lastInsertRowid);
 }
 
-export function getLoop(db: Database, id: number): Record<string, unknown> | undefined {
-  return db.prepare('SELECT * FROM loops WHERE id = ?').get(id) as
-    | Record<string, unknown>
-    | undefined;
+export function getLoop(db: Database, id: number): LoopRow | undefined {
+  return db
+    .prepare('SELECT * FROM loops WHERE id = ?')
+    .get(id) as LoopRow | undefined;
 }
 
-export function getLatestLoop(db: Database): Record<string, unknown> | undefined {
-  return db.prepare('SELECT * FROM loops ORDER BY id DESC LIMIT 1').get() as
-    | Record<string, unknown>
-    | undefined;
+export function getLatestLoop(db: Database): LoopRow | undefined {
+  return db
+    .prepare('SELECT * FROM loops ORDER BY id DESC LIMIT 1')
+    .get() as LoopRow | undefined;
 }
 
 export function countQuestionsInLoop(db: Database, loopId: number): number {
@@ -89,14 +98,18 @@ export function addMemory(
   ).run(residentId, loopId, content, permanent ? 1 : 0);
 }
 
-export function getMemories(db: Database, residentId: string, limit = 10): Array<Record<string, unknown>> {
+export function getMemories(
+  db: Database,
+  residentId: string,
+  limit = 10,
+): MemoryRow[] {
   return db
     .prepare(
       `SELECT content, strength, loop_id FROM memories
        WHERE resident_id = ? AND strength >= 0.3
        ORDER BY is_permanent DESC, strength DESC LIMIT ?`,
     )
-    .all(residentId, limit) as Array<Record<string, unknown>>;
+    .all(residentId, limit) as MemoryRow[];
 }
 
 /** 每轮回衰减非永久记忆（strength ×0.8） */
@@ -119,10 +132,10 @@ export function addEvent(
   ).run(loopId, type, content, isClue ? 1 : 0, isTrap ? 1 : 0);
 }
 
-export function getEvents(db: Database, loopId: number): Array<Record<string, unknown>> {
-  return db.prepare('SELECT * FROM events WHERE loop_id = ? ORDER BY id').all(loopId) as Array<
-    Record<string, unknown>
-  >;
+export function getEvents(db: Database, loopId: number): EventRow[] {
+  return db
+    .prepare('SELECT * FROM events WHERE loop_id = ? ORDER BY id')
+    .all(loopId) as EventRow[];
 }
 
 // ---------- questions ----------
