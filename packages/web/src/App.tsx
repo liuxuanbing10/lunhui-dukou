@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, type LoopResponse, type AskResponse } from './api';
 import { residentName } from './residents';
 import { useTypewriter } from './hooks/useTypewriter';
+import { injectThemeVars } from './visual/theme';
 import { Rain } from './components/Rain';
 import { AskingPhase } from './components/AskingPhase';
 import { ChoicePhase } from './components/ChoicePhase';
@@ -9,9 +10,8 @@ import { DeathPhase } from './components/DeathPhase';
 import { MemoryPhase } from './components/MemoryPhase';
 import './styles.css';
 
-// TODO(integrate): 切换为 visual/theme 的 injectThemeVars() 接管 RainNight 的内联配色（冷蓝/汤碗暖光/记忆琥珀）
-// TODO(integrate): 挂载 <AudioLayer/>（来自 audio/*）与 content/livingTown（来自 content/livingTown）
-// 当前离线判定与 2.5D 雨夜场景均不依赖上述尚未产出的模块，可独立运行。
+// 视觉主题由 visual/theme 接管：App 启动注入 CSS 变量；RainNight 改用 theme token。
+// 音频引擎与活镇内容接入见后续步骤。
 import { RainNight, type RainMode } from './scene/RainNight';
 
 type Phase = 'boot' | 'intro' | 'choice' | 'death' | 'memory';
@@ -31,6 +31,11 @@ export function App() {
   // 「沉默三秒」留白态：命中关键事实时触发，驱动 RainNight 进入 silence 收束
   const [silenceActive, setSilenceActive] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // 注入视觉主题 CSS 变量（visual/theme 的 token → :root 自定义属性，幂等、测试安全）
+  useEffect(() => {
+    injectThemeVars();
+  }, []);
 
   const typewriter = useTypewriter(dialogText, 35, phase === 'intro');
 

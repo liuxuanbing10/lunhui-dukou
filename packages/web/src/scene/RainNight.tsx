@@ -10,25 +10,16 @@
  *      silence → 相机缓动推近汤碗、雨 opacity 降低、Vignette 加深、暖光稍压暗（呼应「沉默三秒」留白）
  *      memory  → 叠加琥珀色半透明叠影层（ghost planes），营造记忆回响
  *
- * 注意：颜色用内联常量（与 docs/art-style-standard-2.5d.md 对齐）。
- * TODO(integrate): 切换为 visual/theme 的 injectThemeVars() 接管下方 COLORS。
- *
- * 该组件完全不依赖尚未产出的 audio/* 与 content/livingTown。
+ * 颜色全部引用 visual/theme 的 theme token（与 docs/art-style-standard-2.5d.md 对齐），
+ * 禁止内联 hex 字面量，确保美术可在 theme.ts 统一微调。
  */
 import { useMemo, useRef } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { EffectComposer, Bloom, Vignette, Noise } from '@react-three/postprocessing';
 import * as THREE from 'three';
+import { theme } from '../visual/theme';
 
 export type RainMode = 'idle' | 'silence' | 'memory';
-
-// 内联颜色常量（与 docs/art-style-standard-2.5d.md 对齐）
-// TODO(integrate): 切换为 visual/theme 的 injectThemeVars()
-const COLORS = {
-  night: '#0b1a2b', // 冷蓝基底
-  bowlWarm: '#ffb15c', // 汤碗暖光
-  memoryAmber: '#d8a24a', // 记忆琥珀
-};
 
 // 雨滴数量（单 instancedMesh = 1 draw call；按设备像素比 dpr=[1,2] 自适应）
 const RAIN_COUNT = 500;
@@ -124,12 +115,12 @@ function RainScene({ mode }: { mode: RainMode }) {
     <>
       <ambientLight intensity={0.12} />
       {/* 汤碗暖光：自发光小碗 + 暖色点光，经 Bloom 发光 */}
-      <pointLight ref={pointLight} color={COLORS.bowlWarm} intensity={2.4} distance={14} position={[0, 0.6, 0]} />
+      <pointLight ref={pointLight} color={theme.warm.soul} intensity={2.4} distance={14} position={[0, 0.6, 0]} />
       <mesh position={[0, 0.55, 0]}>
         <sphereGeometry args={[0.35, 24, 24]} />
         <meshStandardMaterial
-          color={COLORS.bowlWarm}
-          emissive={COLORS.bowlWarm}
+          color={theme.warm.soul}
+          emissive={theme.warm.soul}
           emissiveIntensity={2.2}
           toneMapped={false}
         />
@@ -139,15 +130,15 @@ function RainScene({ mode }: { mode: RainMode }) {
       <group ref={ghostRef} position={[0, 1.4, -1.5]}>
         <mesh position={[-1.2, 0, 0]}>
           <planeGeometry args={[1.6, 3.2]} />
-          <meshBasicMaterial color={COLORS.memoryAmber} transparent opacity={0} depthWrite={false} />
+          <meshBasicMaterial color={theme.memory.amber} transparent opacity={0} depthWrite={false} />
         </mesh>
         <mesh position={[1.4, 0.2, 0.4]}>
           <planeGeometry args={[1.3, 2.6]} />
-          <meshBasicMaterial color={COLORS.memoryAmber} transparent opacity={0} depthWrite={false} />
+          <meshBasicMaterial color={theme.memory.amber} transparent opacity={0} depthWrite={false} />
         </mesh>
         <mesh position={[0.2, -0.4, -0.6]}>
           <planeGeometry args={[2.0, 2.2]} />
-          <meshBasicMaterial color={COLORS.memoryAmber} transparent opacity={0} depthWrite={false} />
+          <meshBasicMaterial color={theme.memory.amber} transparent opacity={0} depthWrite={false} />
         </mesh>
       </group>
 
@@ -157,7 +148,7 @@ function RainScene({ mode }: { mode: RainMode }) {
         args={[undefined, undefined, RAIN_COUNT] as unknown as [THREE.BufferGeometry, THREE.Material, number]}
       >
         <boxGeometry args={[1, 1, 1]} />
-        <meshBasicMaterial ref={rainMat} color="#9fb4d0" transparent opacity={0.5} depthWrite={false} />
+        <meshBasicMaterial ref={rainMat} color={theme.rain.drop} transparent opacity={0.5} depthWrite={false} />
       </instancedMesh>
     </>
   );
@@ -172,8 +163,8 @@ export function RainNight({ mode = 'idle' }: { mode?: RainMode }) {
       camera={{ position: [0, 1.3, 6.2], fov: 50 }}
       gl={{ antialias: true, powerPreference: 'high-performance' }}
     >
-      <color attach="background" args={[COLORS.night]} />
-      <fog attach="fog" args={[COLORS.night, 7, 20]} />
+      <color attach="background" args={[theme.rain.base]} />
+      <fog attach="fog" args={[theme.rain.base, 7, 20]} />
       <RainScene mode={mode} />
       <EffectComposer>
         <Bloom

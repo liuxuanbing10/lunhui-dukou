@@ -21,8 +21,13 @@ body,
   height: 100%;
 }
 
-body {
+/* html 保留暗色兜底（画布未渲染时仍可见暗底）；body 透明以透出底层 R3F 雨夜画布 */
+html {
   background: var(--night);
+}
+
+body {
+  background: transparent;
   color: var(--ink);
   font-family: var(--serif);
   overflow: hidden;
