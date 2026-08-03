@@ -12,6 +12,13 @@ build/
 .env
 .env.local
 data/
+# 例外：web 离线判定所需的浏览器安全真相数据是源码，需纳入版本控制
+#（区别于运行时 data/，如服务端 sqlite 等）
+!packages/web/src/data/
+!packages/web/src/data/**
+# 临时残留：S2 生成脚本曾短暂误写到 packages/engine/web（已修正为 packages/web/src/data），
+# 该目录在沙箱内无法删除，加入忽略以免污染 git status。手动清理后可移除本行。
+packages/engine/web/
 *.db
 *.sqlite
 
