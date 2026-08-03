@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { offlineApi } from './offlineClient';
+import { loopEvents } from './content/livingTown';
 import type { AskResponse } from './api';
 
 describe('offlineClient 确定性判定（零 token / 零后端）', () => {
@@ -39,5 +40,22 @@ describe('offlineClient 确定性判定（零 token / 零后端）', () => {
     expect(choice.accepted).toBe(true);
     const mem = await offlineApi.memory();
     expect(Array.isArray(mem.memories)).toBe(true);
+  });
+
+  it('loopEvents 驱动开场：startLoop.intro 取 loop-start 事件文本', async () => {
+    const loop = await offlineApi.startLoop();
+    const loopStart = loopEvents.find((e) => e.trigger === 'loop-start');
+    expect(loop.intro).toBe(loopStart?.text);
+  });
+
+  it('命中 r1 捞过7次 → 全局 factId 命中 memoryRevenge，跨轮回记忆注入', async () => {
+    await offlineApi.startLoop();
+    // engine 返回的是局部 factId（f1），非 livingTown 的全局 r1:f1
+    const res = await offlineApi.ask(1, 'r1', '你捞过我几次？');
+    expect(res.hitFactId).toBe('f1');
+    expect(res.pause).toBe(true);
+    const mem = await offlineApi.memory();
+    // offlineClient 内部把局部 f1 拼成全局 r1:f1，匹配 memoryRevenge → 记忆回响注入
+    expect(mem.memories.some((m) => m.content.includes('捞过你七次'))).toBe(true);
   });
 });

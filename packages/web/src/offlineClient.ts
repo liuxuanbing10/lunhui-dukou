@@ -12,6 +12,7 @@ import { judgeAsk } from '@lunhui/engine/truth';
 import type { AskResult, Resident } from '@lunhui/engine/types';
 import { RESIDENTS } from './residents';
 import { truthData } from './data/truthData.generated';
+import { loopEvents, memoryRevenge, livingTownResidents } from './content/livingTown';
 import type { AskResponse, ChoiceResponse, LoopResponse, MemoryResponse } from './api';
 
 // 保守兜底文本：命中真相表失败时，不调 LLM，给一句留白式回应（节流且防失控）
@@ -57,10 +58,12 @@ function buildResident(residentId: string): Resident | undefined {
 export const offlineApi = {
   startLoop(): Promise<LoopResponse> {
     state = freshState();
+    // 用 loopEvents 的 loop-start 事件驱动开场氛围（离线叙事数据源）
+    const loopStart = loopEvents.find((e) => e.trigger === 'loop-start');
     return Promise.resolve({
       loopId: state.loopId,
       sequence: state.sequence,
-      intro: '渡口。雨没停过。你又从水里醒来——这一次，你记得一点点东西。',
+      intro: loopStart?.text ?? '渡口。雨没停过。你又从水里醒来——这一次，你记得一点点东西。',
       questionsLeft: state.questionsLeft,
       activeResidents: Object.keys(RESIDENTS),
       events: [],
@@ -82,9 +85,23 @@ export const offlineApi = {
       }));
     }
 
+    // engine 返回局部 factId（如 f2）；livingTown 用 <居民id>:<局部factId> 全局方案（如 r5:f2）。
+    // 拼接全局 key 以便与 loopEvents / memoryRevenge 对齐（不修改 livingTown.ts）。
+    const globalFactId = result.hitFactId ? `${residentId}:${result.hitFactId}` : undefined;
+
+    // 命中真相表事实 → 用 loopEvents 的 fact-hit 事件补充叙事
+    let answerText = result.answer;
+    if (globalFactId) {
+      const factEvent = loopEvents.find((e) => e.trigger === 'fact-hit' && e.factId === globalFactId);
+      if (factEvent) answerText = `${answerText}\n${factEvent.text}`;
+    }
+
     // 命中关键事实 → 累计为「记忆」，供 memory 相位回响
     if (result.hitFactId && result.pause) {
-      s.memories.push(result.answer);
+      s.memories.push(answerText);
+      // 跨轮回记忆复仇：匹配的 factId 注入记忆回响
+      const revenge = memoryRevenge.find((m) => m.factId === globalFactId);
+      if (revenge) s.memories.push(revenge.line);
     }
     s.questionsLeft = Math.max(0, s.questionsLeft - 1);
     s.sequence += 1;
@@ -92,7 +109,7 @@ export const offlineApi = {
     return {
       loopId,
       sequence: s.sequence,
-      answer: result.answer,
+      answer: answerText,
       answerMode: result.answerMode,
       hitFactId: result.hitFactId,
       pause: result.pause,

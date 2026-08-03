@@ -4,6 +4,7 @@ import { residentName } from './residents';
 import { useTypewriter } from './hooks/useTypewriter';
 import { injectThemeVars } from './visual/theme';
 import { createAudioEngine, type AudioEngine } from './audio/audio';
+import { livingTownResidents } from './content/livingTown';
 import { Rain } from './components/Rain';
 import { AskingPhase } from './components/AskingPhase';
 import { ChoicePhase } from './components/ChoicePhase';
@@ -11,9 +12,9 @@ import { DeathPhase } from './components/DeathPhase';
 import { MemoryPhase } from './components/MemoryPhase';
 import './styles.css';
 
-// 视觉主题由 visual/theme 接管：App 启动注入 CSS 变量；RainNight 改用 theme token。
-// 音频引擎已在下方接入（createAudioEngine + 用户手势 start + 沉默/命中控制 + 卸载 dispose）。
-// 活镇内容（livingTownResidents / loopEvents / memoryRevenge）接入见后续步骤。
+// 视觉主题由 visual/theme 接管（App 注入 CSS 变量，RainNight 改用 theme token）；
+// 音频引擎已接入（createAudioEngine + 用户手势 start + 沉默/命中控制 + 卸载 dispose）；
+// 活镇内容已接入（App 用 livingTownResidents 接管居民展示，offlineClient 用 loopEvents/memoryRevenge 驱动叙事）。
 import { RainNight, type RainMode } from './scene/RainNight';
 
 type Phase = 'boot' | 'intro' | 'choice' | 'death' | 'memory';
@@ -174,7 +175,7 @@ export function App() {
 
           {phase === 'intro' && loop && (
             <AskingPhase
-              residentIds={loop.activeResidents}
+              residentIds={livingTownResidents.map((r) => r.id)}
               selected={selected}
               question={question}
               questionsLeft={questionsLeft}
