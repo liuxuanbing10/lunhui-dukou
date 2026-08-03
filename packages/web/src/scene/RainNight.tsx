@@ -2,13 +2,15 @@
  * RainNight.tsx — 2.5D 雨夜高质量视觉（程序化着色器氛围，不加载外部图片 / 不烧 token）
  * ----------------------------------------------------------------------------
  * 设计对标 3A 雨夜氛围，纯程序化：
- *  - 雨：instanced 线条下落并回收（单 draw call，按 dpr 自适应）
+ *  - 雨：instanced 线条下落并回收（单 draw call，按 dpr 自适应；silence 段雨势减弱）
  *  - 汤碗暖光：底部中心自发光小碗 + 暖色 pointLight，经 Bloom 发光
+ *  - 水面涟漪：噪声 + 正弦扰动 GLSL 着色器（标准 §4.3），命中真相进入 silence 时涟漪脉冲一次
  *  - 后期：EffectComposer → Bloom / Vignette / Noise（Bloom 克制、Vignette 收紧暗角）
  *  - 视差：useFrame 中相机随 sin(t) 轻微推拉 / 横移（景深感，不晃眼）
+ *  - 记忆叠影：琥珀/锈红/残光三色 ghost planes，offset 漂移 + 色相分层（标准 §4.4）
  *  - 模式响应：
- *      silence → 相机缓动推近汤碗、雨 opacity 降低、Vignette 加深、暖光稍压暗（呼应「沉默三秒」留白）
- *      memory  → 叠加琥珀色半透明叠影层（ghost planes），营造记忆回响
+ *      silence → 相机缓动推近汤碗、雨势减弱、冷蓝环境光淡出至 ~20%、Vignette 加深、暖光稍压暗、涟漪脉冲
+ *      memory  → 叠加琥珀/锈红半透明叠影层（ghost planes），营造记忆回响
  *
  * 颜色全部引用 visual/theme 的 theme token（与 docs/art-style-standard-2.5d.md 对齐），
  * 禁止内联 hex 字面量，确保美术可在 theme.ts 统一微调。
@@ -24,6 +26,8 @@ export type RainMode = 'idle' | 'silence' | 'memory';
 
 // 雨滴数量（单 instancedMesh = 1 draw call；按设备像素比 dpr=[1,2] 自适应）
 const RAIN_COUNT = 500;
+// silence 段雨势减弱（标准 §4.3：密度随演出状态可调）
+const RAIN_COUNT_SILENCE = 280;
 
 interface Drop {
   x: number;
@@ -33,11 +37,84 @@ interface Drop {
   len: number;
 }
 
+/* ---------- 水面涟漪着色器（标准 §4.3：噪声 + 正弦扰动，无贴图，单 draw call） ---------- */
+
+const RIPPLE_VERT = /* glsl */ `
+varying vec2 vUv;
+void main() {
+  vUv = uv;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}
+`;
+
+const RIPPLE_FRAG = /* glsl */ `
+uniform float uTime;
+uniform float uPulse;      // 0..1 涟漪脉冲（命中真相进入 silence 时触发）
+uniform vec3 uDeep;        // 深水色（rain.fog）
+uniform vec3 uMist;        // 雾蓝（rain.mist）
+uniform vec3 uHighlight;   // 雨丝高光（rain.drop）
+uniform vec3 uWarm;        // 汤碗暖光（warm.soul）
+varying vec2 vUv;
+
+float hash(vec2 p) {
+  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+}
+
+float noise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(
+    mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x),
+    mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x),
+    f.y
+  );
+}
+
+void main() {
+  vec2 c = vUv - vec2(0.5, 0.62);          // 涟漪中心对位汤碗（略偏画面深处）
+  float d = length(c);
+
+  // 基础水面：两层漂移噪声
+  float n = noise(vUv * 14.0 + vec2(uTime * 0.18, uTime * 0.11));
+  n += 0.5 * noise(vUv * 30.0 - vec2(uTime * 0.26, 0.0));
+
+  // 环状涟漪：常态缓，脉冲时加密加快（命中真相的一次「心跳」）
+  float ring = sin(d * 60.0 - uTime * 2.0) * 0.5 + 0.5;
+  float pulseRing = sin(d * 90.0 - uTime * 7.0) * 0.5 + 0.5;
+  float rings = mix(ring * 0.15, pulseRing * 0.8, uPulse);
+
+  // 径向衰减：边缘溶进雾里
+  float fade = smoothstep(0.55, 0.15, d);
+
+  // 汤碗暖光在水面的倒影光柱
+  float warmCol = smoothstep(0.16, 0.0, abs(c.x)) * smoothstep(0.45, 0.0, d);
+
+  vec3 col = mix(uDeep, uMist, n * 0.55 + rings * 0.3);
+  col += uHighlight * rings * 0.12;
+  col += uWarm * warmCol * (0.18 + uPulse * 0.35);
+
+  float alpha = fade * (0.55 + rings * 0.2 + uPulse * 0.15);
+  gl_FragColor = vec4(col, alpha);
+}
+`;
+
+/* ---------- 记忆叠影配置（标准 §4.4：offset 漂移 + 色相分层） ---------- */
+
+const GHOSTS = [
+  { pos: [-1.2, 0, 0], size: [1.6, 3.2], color: theme.memory.amber, phase: 0.0 },
+  { pos: [1.4, 0.2, 0.4], size: [1.3, 2.6], color: theme.memory.rust, phase: 2.1 },
+  { pos: [0.2, -0.4, -0.6], size: [2.0, 2.2], color: theme.memory.ghost, phase: 4.2 },
+] as const;
+
 function RainScene({ mode }: { mode: RainMode }) {
   const rainRef = useRef<THREE.InstancedMesh>(null);
   const rainMat = useRef<THREE.MeshBasicMaterial>(null);
   const pointLight = useRef<THREE.PointLight>(null);
+  const ambientLight = useRef<THREE.AmbientLight>(null);
   const ghostRef = useRef<THREE.Group>(null);
+  const prevModeRef = useRef<RainMode>(mode);
+  const pulseRef = useRef(0);
   const { camera } = useThree();
 
   const drops = useMemo<Drop[]>(() => {
@@ -56,9 +133,37 @@ function RainScene({ mode }: { mode: RainMode }) {
 
   const dummy = useMemo(() => new THREE.Object3D(), []);
 
+  // 水面涟漪材质：theme token 注入 uniform（禁止内联 hex）
+  const rippleMat = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        transparent: true,
+        depthWrite: false,
+        uniforms: {
+          uTime: { value: 0 },
+          uPulse: { value: 0 },
+          uDeep: { value: new THREE.Color(theme.rain.fog) },
+          uMist: { value: new THREE.Color(theme.rain.mist) },
+          uHighlight: { value: new THREE.Color(theme.rain.drop) },
+          uWarm: { value: new THREE.Color(theme.warm.soul) },
+        },
+        vertexShader: RIPPLE_VERT,
+        fragmentShader: RIPPLE_FRAG,
+      }),
+    [],
+  );
+
   useFrame((state, dt) => {
     const t = state.clock.elapsedTime;
     const k = Math.min(1, dt * 1.5); // 缓动系数，避免帧率敏感
+
+    // 涟漪脉冲：进入 silence（命中真相）瞬间触发一次，约 1.4s 衰减
+    if (mode === 'silence' && prevModeRef.current !== 'silence') pulseRef.current = 1;
+    prevModeRef.current = mode;
+    pulseRef.current = Math.max(0, pulseRef.current - dt / 1.4);
+    rippleMat.uniforms.uTime!.value = t;
+    rippleMat.uniforms.uPulse!.value =
+      mode === 'silence' ? Math.max(pulseRef.current, 0.35) : pulseRef.current;
 
     // 相机视差（景深感，不晃眼）
     const targetX = mode === 'silence' ? 0 : Math.sin(t * 0.3) * 0.7;
@@ -69,10 +174,11 @@ function RainScene({ mode }: { mode: RainMode }) {
     camera.position.z += (targetZ - camera.position.z) * k;
     camera.lookAt(0, 1.1, 0);
 
-    // 雨：下落并回收
+    // 雨：下落并回收（silence 段减弱雨势）
     const mesh = rainRef.current;
     if (mesh) {
-      for (let i = 0; i < RAIN_COUNT; i++) {
+      mesh.count = mode === 'silence' ? RAIN_COUNT_SILENCE : RAIN_COUNT;
+      for (let i = 0; i < mesh.count; i++) {
         const drop = drops[i];
         if (!drop) continue;
         drop.y -= drop.speed * dt;
@@ -100,23 +206,33 @@ function RainScene({ mode }: { mode: RainMode }) {
       pointLight.current.intensity += (target - pointLight.current.intensity) * Math.min(1, dt * 2);
     }
 
-    // 记忆叠影：amber ghost planes 渐显
+    // 冷蓝环境光：silence 淡出至 ~20%（标准 §4.2），让暖光成为唯一剩的话
+    if (ambientLight.current) {
+      const target = mode === 'silence' ? 0.025 : 0.12;
+      ambientLight.current.intensity +=
+        (target - ambientLight.current.intensity) * Math.min(1, dt * 2);
+    }
+
+    // 记忆叠影：琥珀/锈红/残光三层渐显 + offset 漂移（标准 §4.4）
     if (ghostRef.current) {
       const target = mode === 'memory' ? 0.16 : 0;
       for (const child of ghostRef.current.children) {
         const m = (child as THREE.Mesh).material as THREE.MeshBasicMaterial;
         m.opacity += (target - m.opacity) * Math.min(1, dt * 2);
         m.visible = m.opacity > 0.002;
+        const { base, phase } = child.userData as { base: readonly number[]; phase: number };
+        child.position.x = base[0]! + Math.sin(t * 0.4 + phase) * 0.18;
+        child.position.y = base[1]! + Math.sin(t * 0.27 + phase * 1.3) * 0.1;
       }
     }
   });
 
   return (
     <>
-      <ambientLight intensity={0.12} />
-      {/* 汤碗暖光：自发光小碗 + 暖色点光，经 Bloom 发光 */}
+      <ambientLight ref={ambientLight} intensity={0.12} />
+      {/* 汤碗暖光：自发光小碗 + 暖色点光，经 Bloom 发光（C1 汤碗资产到位后替换 mesh） */}
       <pointLight ref={pointLight} color={theme.warm.soul} intensity={2.4} distance={14} position={[0, 0.6, 0]} />
-      <mesh position={[0, 0.55, 0]}>
+      <mesh position={[0, 0.55, 0]} scale={[1, 0.7, 1]}>
         <sphereGeometry args={[0.35, 24, 24]} />
         <meshStandardMaterial
           color={theme.warm.soul}
@@ -126,20 +242,20 @@ function RainScene({ mode }: { mode: RainMode }) {
         />
       </mesh>
 
-      {/* 记忆琥珀叠影层（memory 模式渐显） */}
+      {/* 水面涟漪：噪声 + 正弦扰动着色器（单 draw call，无贴图） */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.55, -2]}>
+        <planeGeometry args={[44, 34, 1, 1]} />
+        <primitive object={rippleMat} attach="material" />
+      </mesh>
+
+      {/* 记忆叠影层（memory 模式渐显，三色分层 + 漂移） */}
       <group ref={ghostRef} position={[0, 1.4, -1.5]}>
-        <mesh position={[-1.2, 0, 0]}>
-          <planeGeometry args={[1.6, 3.2]} />
-          <meshBasicMaterial color={theme.memory.amber} transparent opacity={0} depthWrite={false} />
-        </mesh>
-        <mesh position={[1.4, 0.2, 0.4]}>
-          <planeGeometry args={[1.3, 2.6]} />
-          <meshBasicMaterial color={theme.memory.amber} transparent opacity={0} depthWrite={false} />
-        </mesh>
-        <mesh position={[0.2, -0.4, -0.6]}>
-          <planeGeometry args={[2.0, 2.2]} />
-          <meshBasicMaterial color={theme.memory.amber} transparent opacity={0} depthWrite={false} />
-        </mesh>
+        {GHOSTS.map((g, i) => (
+          <mesh key={i} position={[g.pos[0], g.pos[1], g.pos[2]]} userData={{ base: g.pos, phase: g.phase }}>
+            <planeGeometry args={[g.size[0], g.size[1]]} />
+            <meshBasicMaterial color={g.color} transparent opacity={0} depthWrite={false} />
+          </mesh>
+        ))}
       </group>
 
       {/* 雨：instanced 线条（单 draw call） */}
