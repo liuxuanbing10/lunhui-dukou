@@ -5,13 +5,14 @@
   "description": "轮回渡口 - Fastify API（审问/轮回/记忆）",
   "type": "module",
   "scripts": {
-    "dev": "tsx watch --env-file=../../.env src/index.ts",
-    "build": "tsc -p tsconfig.json",
-    "start": "node --env-file=../../.env dist/index.js",
-    "test": "cross-env LLM_MOCK=1 node --env-file=../../.env --import tsx --test src/**/*.test.ts",
-    "test:live": "cross-env LLM_MOCK=0 node --env-file=../../.env --import tsx --test src/services/llm-generator.test.ts",
+    "dev": "tsx watch --env-file-if-exists=../../.env src/index.ts",
+    "build": "npm run clean && tsc -p tsconfig.json",
+    "start": "node --env-file-if-exists=../../.env dist/index.js",
+    "test": "vitest run",
+    "test:live": "cross-env LLM_MOCK=0 vitest run src/services/llm-generator.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "eslint src"
+    "lint": "eslint src",
+    "clean": "node -e \"import('node:fs').then(fs=>fs.rmSync('dist',{recursive:true,force:true}))\""
   },
   "dependencies": {
     "@lunhui/engine": "*",

@@ -12,9 +12,16 @@
     "dev:server": "npm run dev --workspace=@lunhui/server",
     "dev:engine": "npm run dev --workspace=@lunhui/engine",
     "build": "npm run build --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present",
+    "test": "vitest run",
+    "test:web": "npm run test -w @lunhui/web",
+    "test:engine": "npm run test -w @lunhui/engine",
+    "test:server": "npm run test -w @lunhui/server",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "lint": "npm run lint --workspaces --if-present"
+    "lint": "npm run lint --workspaces --if-present",
+    "changeset": "changesets",
+    "version": "changesets version",
+    "release": "changesets version && npm run build",
+    "publish": "changesets publish"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
@@ -24,6 +31,8 @@
     "prettier": "^3.3.0",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0",
+    "vitest": "^4.1.10",
+    "@changesets/cli": "^2.27.0",
     "typescript-eslint": "^8.0.0"
   },
   "engines": {

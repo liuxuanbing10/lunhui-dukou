@@ -84,10 +84,21 @@ describe('ChoicePhase', () => {
 
 describe('MemoryPhase', () => {
   it('有记忆时渲染，无记忆返回 null', () => {
-    const { rerender } = render(<MemoryPhase lines={['蓑衣人提到：我捞过你']} />);
+    const { rerender } = render(<MemoryPhase lines={['蓑衣人提到：我捞过你']} onContinue={noop} />);
     expect(screen.getByText('你记得：')).toBeTruthy();
-    rerender(<MemoryPhase lines={[]} />);
+    rerender(<MemoryPhase lines={[]} onContinue={noop} />);
     expect(screen.queryByText('你记得：')).toBeNull();
+  });
+
+  it('有记忆时提供继续出口，点击触发 onContinue（修复 memory 相位卡死）', async () => {
+    const user = userEvent.setup();
+    let continued = false;
+    render(
+      <MemoryPhase lines={['蓑衣人提到：我捞过你']} onContinue={() => { continued = true; }} />,
+    );
+    const btn = screen.getByRole('button', { name: /醒来，继续这趟渡口/ });
+    await user.click(btn);
+    expect(continued).toBe(true);
   });
 });
 

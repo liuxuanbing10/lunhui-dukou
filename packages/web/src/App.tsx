@@ -9,7 +9,7 @@ import { DeathPhase } from './components/DeathPhase';
 import { MemoryPhase } from './components/MemoryPhase';
 import './styles.css';
 
-type Phase = 'boot' | 'intro' | 'asking' | 'choice' | 'death' | 'memory';
+type Phase = 'boot' | 'intro' | 'choice' | 'death' | 'memory';
 
 export function App() {
   const [phase, setPhase] = useState<Phase>('boot');
@@ -25,7 +25,7 @@ export function App() {
   const [busy, setBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const typewriter = useTypewriter(dialogText, 35, phase === 'intro' || phase === 'asking');
+  const typewriter = useTypewriter(dialogText, 35, phase === 'intro');
 
   // 开场：自动开始轮回
   useEffect(() => {
@@ -111,7 +111,7 @@ export function App() {
     }
   }, [busy]);
 
-  const showTypewriter = phase === 'intro' || phase === 'asking' || phase === 'memory';
+  const showTypewriter = phase === 'intro' || phase === 'memory';
 
   return (
     <>
@@ -141,23 +141,11 @@ export function App() {
             />
           )}
 
-          {phase === 'asking' && loop && (
-            <AskingPhase
-              residentIds={loop.activeResidents}
-              selected={selected}
-              question={question}
-              questionsLeft={questionsLeft}
-              busy={busy}
-              inputRef={inputRef}
-              onSelect={setSelected}
-              onQuestionChange={setQuestion}
-              onAsk={handleAsk}
-            />
-          )}
-
           {phase === 'choice' && <ChoicePhase busy={busy} onChoice={handleChoice} />}
 
-          {phase === 'memory' && <MemoryPhase lines={memoryLines} />}
+          {phase === 'memory' && (
+            <MemoryPhase lines={memoryLines} onContinue={() => setPhase('intro')} />
+          )}
         </div>
       </div>
 

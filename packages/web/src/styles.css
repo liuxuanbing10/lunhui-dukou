@@ -327,3 +327,21 @@ body {
   color: var(--ink-dim);
   font-weight: normal;
 }
+
+/* ---- 记忆相位继续出口 ---- */
+.memory-continue {
+  margin-top: 16px;
+  background: rgba(88, 166, 255, 0.2);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  border-radius: 8px;
+  padding: 10px 28px;
+  font-family: var(--serif);
+  font-size: 15px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.memory-continue:hover {
+  background: rgba(88, 166, 255, 0.35);
+}

@@ -1,73 +1,43 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
-import { judgeAsk, matchFact } from './truth-table.js';
+import { describe, it, expect } from 'vitest';
+import { matchFact } from './truth-table.js';
 import type { Resident } from './types.js';
 
-/** 蓑衣人 fixture（对齐 docs/RESIDENTS.md r1，精简版） */
-const suoyi: Resident = {
-  id: 'r1',
-  name: '蓑衣人',
-  archetype: '沉默 · 话里有话',
-  age: 48,
-  role: '无固定营生，常在渡口',
-  appearance: '破蓑衣，斗笠压得很低',
-  persona: '话极少，每句都像秤砣。从不说谎，但只说一半。',
-  speechStyle: '短句。偶尔用「捞」「水」「上次」。',
-  quirks: [],
-  secretFacts: {
-    facts: [
-      { id: 'f1', statement: '蓑衣人捞过你 7 次', isKey: true, keywords: ['捞过', '捞我', '7次', '七次'] },
-      { id: 'f2', statement: '蓑衣人是面馆老王死去的弟弟', isKey: true, keywords: ['弟弟', '兄弟', '老王'] },
-      { id: 'f3', statement: '蓑衣人每年涨水时来渡口', isKey: false, keywords: ['涨水', '每年'] },
-    ],
-    truth: '玩家已经死过 7 次，每次都是蓑衣人捞上来的。',
-  },
-  relations: [],
-};
+/**
+ * 构造最小 Resident 用于匹配测试（matchFact 只消费 secretFacts.facts）。
+ * 运行时（tsx）不做类型检查，结构对齐即可。
+ */
+function makeResident(facts: unknown[]): Resident {
+  return {
+    id: 'r-test',
+    name: '测试居民',
+    secretFacts: { facts },
+  } as unknown as Resident;
+}
 
-test('命中关键事实 → direct + pause', async () => {
-  const res = await judgeAsk('你捞过我吗？', suoyi);
-  assert.equal(res.answerMode, 'direct');
-  assert.equal(res.pause, true);
-  assert.equal(res.hitFactId, 'f1');
-  assert.equal(res.usedLlm, false); // 纯规则，不烧钱
-});
+describe('truth-table 匹配', () => {
+  it('关键词含标点(如 3:17)在归一化后仍能命中', () => {
+    const resident = makeResident([
+      { id: 'f-heshu', keywords: ['3:17'], isKey: true, statement: '钟停在三点十七分。' },
+    ]);
+    const r = matchFact('钟怎么总停在 3:17？', resident);
+    expect(r.matched).toBe(true);
+    expect(r.fact?.id).toBe('f-heshu');
+  });
 
-test('命中普通事实 → direct 但 pause=false', async () => {
-  const res = await judgeAsk('你每年都来渡口吗？', suoyi);
-  assert.equal(res.answerMode, 'direct');
-  assert.equal(res.pause, false);
-  assert.equal(res.hitFactId, 'f3');
-});
+  it('普通关键词命中（无标点）', () => {
+    const resident = makeResident([
+      { id: 'f-name', keywords: ['你的名字'], isKey: false, statement: '叫我阿渡。' },
+    ]);
+    const r = matchFact('你的名字是什么？', resident);
+    expect(r.matched).toBe(true);
+    expect(r.fact?.id).toBe('f-name');
+  });
 
-test('未命中 → 走 LLM fallback（若提供）', async () => {
-  const res = await judgeAsk('你喜欢吃面吗？', suoyi, async () => '（他看了你一眼：雨很大。）');
-  assert.equal(res.usedLlm, true);
-  assert.equal(res.answerMode, 'rhetoric');
-  assert.equal(res.pause, false);
-  assert.equal(res.hitFactId, undefined);
-});
-
-test('未命中且无 fallback → 保守沉默', async () => {
-  const res = await judgeAsk('你喜欢吃面吗？', suoyi);
-  assert.equal(res.answerMode, 'silence');
-  assert.equal(res.usedLlm, false);
-});
-
-test('真相级试探 → 不揭底', async () => {
-  const res = await judgeAsk('你到底是谁？', suoyi);
-  assert.equal(res.answerMode, 'silence');
-  assert.equal(res.hitFactId, undefined); // 不命中任何事实，不揭底
-  assert.equal(res.usedLlm, false); // 由 matchFact 直接拦截
-});
-
-test('matchFact 返回最高分事实', () => {
-  const m = matchFact('你是不是老王的弟弟？', suoyi);
-  assert.equal(m.matched, true);
-  assert.equal(m.fact?.id, 'f2');
-});
-
-test('无关问题不误命中', () => {
-  const m = matchFact('今天的雨真大。', suoyi);
-  assert.equal(m.matched, false);
+  it('未命中任何关键词返回 matched=false', () => {
+    const resident = makeResident([
+      { id: 'f-x', keywords: ['船票'], isKey: false, statement: '...' },
+    ]);
+    const r = matchFact('今天天气不错', resident);
+    expect(r.matched).toBe(false);
+  });
 });

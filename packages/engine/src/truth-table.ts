@@ -51,9 +51,10 @@ export function matchFact(question: string, resident: Resident): MatchResult {
     let score = 0;
     let kwHit: string | undefined;
     for (const kw of kws) {
-      if (q.includes(kw)) {
+      const nkw = normalize(kw);
+      if (q.includes(nkw)) {
         score += 1;
-        kwHit ??= kw;
+        kwHit ??= nkw;
       }
     }
     if (score > bestScore) {
