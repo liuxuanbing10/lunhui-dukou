@@ -344,7 +344,11 @@ class WebAudioEngine implements AudioEngine {
 /**
  * 创建音频引擎实例。惰性创建 AudioContext（首次 start 时），
  * 因此本函数本身在测试 / SSR 环境下也安全、不抛错。
+ *
+ * @param opts.muted     主静音开关（默认 false）
+ * @param opts.silenceMs 沉默三秒时长（ms），默认 2800；音频过渡 = silenceMs×0.16
+ *                       自动跟随，供移动端(3000)/演出减速(×1.5→4200)透传缩放。
  */
-export function createAudioEngine(opts?: { muted?: boolean }): AudioEngine {
-  return new WebAudioEngine(opts);
+export function createAudioEngine(opts?: { muted?: boolean; silenceMs?: number }): AudioEngine {
+  return new WebAudioEngine({ muted: opts?.muted, silenceMs: opts?.silenceMs });
 }

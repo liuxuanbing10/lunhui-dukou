@@ -50,4 +50,17 @@ describe('audio engine API shape', () => {
       engine.dispose();
     }).not.toThrow();
   });
+
+  it('工厂透出 silenceMs：createAudioEngine({ silenceMs: 3000 }) 可构造且不抛错', () => {
+    expect(() => {
+      const engine = createAudioEngine({ silenceMs: 3000 });
+      // 默认行为不受影响：实例仍暴露完整 API，且未触发 AudioContext 时不抛错
+      for (const m of ['start', 'stop', 'setSilence', 'playReveal', 'playReject', 'setMuted', 'dispose']) {
+        expect(typeof (engine as unknown as Record<string, unknown>)[m]).toBe('function');
+      }
+      engine.start();
+      engine.setSilence(true);
+      engine.dispose();
+    }).not.toThrow();
+  });
 });
