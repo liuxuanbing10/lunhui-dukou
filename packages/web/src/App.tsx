@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, lazy, Suspense } from 'react';
 import { api, type LoopResponse, type AskResponse } from './api';
 import { residentName } from './residents';
 import { useTypewriter } from './hooks/useTypewriter';
 import { injectThemeVars } from './visual/theme';
-import { createAudioEngine, type AudioEngine } from './audio/audio';
+import { createAudioEngine, SILENCE_MS, type AudioEngine } from './audio/audio';
 import { livingTownResidents } from './content/livingTown';
 import { Rain } from './components/Rain';
 import { AskingPhase } from './components/AskingPhase';
@@ -15,12 +15,14 @@ import './styles.css';
 // 视觉主题由 visual/theme 接管（App 注入 CSS 变量，RainNight 改用 theme token）；
 // 音频引擎已接入（createAudioEngine({ silenceMs }) + 用户手势 start + 沉默/命中控制 + 卸载 dispose）；
 // 活镇内容已接入（App 用 livingTownResidents 接管居民展示，offlineClient 用 loopEvents/memoryRevenge 驱动叙事）。
-import { RainNight, type RainMode } from './scene/RainNight';
+// RainNight（three/R3F 重依赖）走懒加载：WebGL chunk 不阻塞首屏交互层；
+// 模式推导在 App 侧（命中关键 → silence 收束；memory 相位 → 记忆叠影；其余 idle）。
+const RainNight = lazy(() => import('./scene/RainNight'));
+import type { RainMode } from './scene/RainNight';
 
 type Phase = 'boot' | 'intro' | 'choice' | 'death' | 'memory';
 
-/** 「沉默三秒」留白时长（ms）：驱动视觉收束窗口，并透传给音频引擎（音频过渡 = SILENCE_MS×0.16） */
-const SILENCE_MS = 2600;
+// SILENCE_MS 唯一真源在 audio/audio.ts（App 的 setTimeout、RainNight re-export、音频过渡均引用它）
 
 export function App() {
   const [phase, setPhase] = useState<Phase>('boot');
@@ -164,7 +166,9 @@ export function App() {
 
   return (
     <>
-      <RainNight mode={rainMode} />
+      <Suspense fallback={null}>
+        <RainNight mode={rainMode} />
+      </Suspense>
       <Rain />
       <div className="stage">
         <h1 className="title">轮回渡口</h1>

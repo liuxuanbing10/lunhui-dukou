@@ -18,12 +18,12 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { EffectComposer, Bloom, Vignette, Noise } from '@react-three/postprocessing';
 import * as THREE from 'three';
 import { theme } from '../visual/theme';
+import { SILENCE_MS } from '../audio/audio';
 
 export type RainMode = 'idle' | 'silence' | 'memory';
 
 // 雨滴数量（单 instancedMesh = 1 draw call；按设备像素比 dpr=[1,2] 自适应）
 const RAIN_COUNT = 500;
-const SILENCE_MS = 2600;
 
 interface Drop {
   x: number;
@@ -179,5 +179,8 @@ export function RainNight({ mode = 'idle' }: { mode?: RainMode }) {
     </Canvas>
   );
 }
+
+// 默认导出供 App 侧 React.lazy 动态分包（three/R3F 不阻塞首屏）
+export default RainNight;
 
 export { SILENCE_MS };

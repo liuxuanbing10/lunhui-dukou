@@ -12,7 +12,7 @@ import { judgeAsk } from '@lunhui/engine/truth';
 import type { AskResult, Resident } from '@lunhui/engine/types';
 import { RESIDENTS } from './residents';
 import { truthData } from './data/truthData.generated';
-import { loopEvents, memoryRevenge, livingTownResidents } from './content/livingTown';
+import { loopEvents, memoryRevenge } from './content/livingTown';
 import type { AskResponse, ChoiceResponse, LoopResponse, MemoryResponse } from './api';
 
 // 保守兜底文本：命中真相表失败时，不调 LLM，给一句留白式回应（节流且防失控）

@@ -112,6 +112,20 @@ export function getMemories(
     .all(residentId, limit) as MemoryRow[];
 }
 
+/** 玩家记忆：跨轮回可见的强记忆（strength≥0.3，永久优先，取前 20） */
+export function getStrongMemories(db: Database): Array<{
+  content: string;
+  strength: number;
+  loop_id: number | null;
+}> {
+  return db
+    .prepare(
+      `SELECT content, strength, loop_id FROM memories
+       WHERE strength >= 0.3 ORDER BY is_permanent DESC, strength DESC LIMIT 20`,
+    )
+    .all() as Array<{ content: string; strength: number; loop_id: number | null }>;
+}
+
 /** 每轮回衰减非永久记忆（strength ×0.8） */
 export function decayMemories(db: Database): void {
   db.prepare('UPDATE memories SET strength = strength * 0.8 WHERE is_permanent = 0').run();

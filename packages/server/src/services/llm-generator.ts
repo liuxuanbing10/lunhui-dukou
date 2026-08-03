@@ -9,6 +9,18 @@
  * 模型：sophnet 用 deepseek-v4-flash，DeepSeek 官方用 deepseek-v4-flash
  */
 import OpenAI from 'openai';
+import {
+  wrap,
+  retry,
+  circuitBreaker,
+  handleAll,
+  timeout,
+  TimeoutStrategy,
+  ConsecutiveBreaker,
+  ExponentialBackoff,
+  BrokenCircuitError,
+} from 'cockatiel';
+import type { CircuitBreakerPolicy, IPolicy, IDefaultPolicyContext } from 'cockatiel';
 import type { Resident } from '@lunhui/engine';
 import { getMemories } from '../db/repository.js';
 import type { Database } from 'better-sqlite3';
@@ -40,6 +52,60 @@ export function buildProviders(): Provider[] {
     });
   }
   return providers;
+}
+
+// ---------- 容灾策略（cockatiel：timeout + retry + 熔断） ----------
+// 参数可经环境变量覆盖（测试用），默认值对齐 ROADMAP P1-6：
+//   LLM_TIMEOUT_MS          单次调用超时（默认 15s；挂起不再无限等待）
+//   LLM_MAX_ATTEMPTS        重试次数（默认 2 = 首试 + 1 次重试）
+//   LLM_BREAKER_THRESHOLD   熔断阈值（默认连续 3 次失败 → 熔断该 provider）
+//   LLM_BREAKER_HALF_OPEN_MS 熔断后多久试探恢复（默认 30s）
+function policyOptions() {
+  return {
+    timeoutMs: Number(process.env.LLM_TIMEOUT_MS ?? '15000'),
+    maxAttempts: Number(process.env.LLM_MAX_ATTEMPTS ?? '2'),
+    breakerThreshold: Number(process.env.LLM_BREAKER_THRESHOLD ?? '3'),
+    halfOpenAfterMs: Number(process.env.LLM_BREAKER_HALF_OPEN_MS ?? '30000'),
+  };
+}
+
+/** 每个 provider 一份熔断器（模块级缓存；resetProviderPolicies 供测试隔离） */
+const breakerCache = new Map<string, CircuitBreakerPolicy>();
+const policyCache = new Map<string, IPolicy<IDefaultPolicyContext>>();
+
+/** 测试/热更新后清空调用。 */
+export function resetProviderPolicies(): void {
+  breakerCache.clear();
+  policyCache.clear();
+}
+
+/**
+ * 为指定 provider 构建（或取缓存的）容灾策略：
+ * 外层熔断 → 中层重试（指数退避）→ 内层超时。
+ * 挂起的 provider 会被超时斩断；连续失败会被熔断跳过（不再浪费额度/时间）。
+ */
+export function getProviderPolicy(name: string): IPolicy<IDefaultPolicyContext> {
+  const cached = policyCache.get(name);
+  if (cached) return cached;
+  const o = policyOptions();
+  let breaker = breakerCache.get(name);
+  if (!breaker) {
+    breaker = circuitBreaker(handleAll, {
+      breaker: new ConsecutiveBreaker(o.breakerThreshold),
+      halfOpenAfter: o.halfOpenAfterMs,
+    });
+    breakerCache.set(name, breaker);
+  }
+  const policy = wrap(
+    breaker,
+    retry(handleAll, {
+      maxAttempts: o.maxAttempts,
+      backoff: new ExponentialBackoff({ initialDelay: 300, maxDelay: 2000 }),
+    }),
+    timeout(o.timeoutMs, TimeoutStrategy.Aggressive),
+  );
+  policyCache.set(name, policy);
+  return policy;
 }
 
 /**
@@ -140,6 +206,14 @@ async function callProvider(
 }
 
 /**
+ * 在容灾策略（timeout+retry+熔断）下调用任意异步函数。导出供测试验证策略本身。
+ * 挂起 → TaskCancelledError；连续失败 → 熔断后 BrokenCircuitError。
+ */
+export function callWithResilience<T>(providerName: string, fn: () => Promise<T>): Promise<T> {
+  return getProviderPolicy(providerName).execute(fn);
+}
+
+/**
  * 生成居民回答（多 provider 容灾）。
  * 测试/CI 环境：LLM_MOCK=1 时返回固定回答（不烧 token 额度），由测试断言覆盖生成逻辑。
  * @returns { text, provider } 回答文本 + 实际使用的 provider
@@ -168,14 +242,22 @@ export async function generateAnswer(
     };
   }
 
+  const opts = policyOptions();
   let lastErr: unknown;
   for (const p of providers) {
     try {
-      const text = await callProvider(p, systemPrompt, userPrompt);
+      // 容灾链：熔断（跳过烂掉的 provider）→ 重试（指数退避）→ 超时（斩断挂起）
+      const text = await getProviderPolicy(p.name).execute(() =>
+        callProvider(p, systemPrompt, userPrompt),
+      );
       return { text, provider: p.name };
     } catch (err) {
       lastErr = err;
-      console.warn(`[llm] provider ${p.name} 失败: ${(err as Error).message}`);
+      if (err instanceof BrokenCircuitError) {
+        console.warn(`[llm] provider ${p.name} 已熔断，跳过（${opts.halfOpenAfterMs}ms 后试探）`);
+      } else {
+        console.warn(`[llm] provider ${p.name} 失败: ${(err as Error).message}`);
+      }
     }
   }
   // 全部失败 → 保守兜底

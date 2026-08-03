@@ -44,10 +44,15 @@ const WARM_FREQ_A = 65; // 低频正弦（sub）
 const WARM_FREQ_B = 98; // 三角波（暖色泛音，约纯五度）
 const WARM_SILENCE = 0.03; // 沉默段稍压暗但保留
 
-// 沉默过渡时间系数：音频收敛时长 = silenceMs × 该系数（默认 2800×0.16≈448ms），
+// 沉默过渡时间系数：音频收敛时长 = silenceMs × 该系数（2600×0.16≈416ms），
 // 确保落进视觉 T1(0–500ms) 暖光收束窗口内同帧（对齐 art-style §5.1）。
 const SILENCE_TC_FACTOR = 0.16;
-const DEFAULT_SILENCE_MS = 2800;
+
+/**
+ * 「沉默三秒」留白时长（ms）——全项目唯一真源。
+ * App 的 setTimeout、RainNight 的 re-export、音频引擎默认值均引用此常量，禁止另行定义。
+ */
+export const SILENCE_MS = 2600;
 
 // 命中真相：克制钟鸣
 const REVEAL_F = 523.25; // C5 基频
@@ -121,14 +126,14 @@ class WebAudioEngine implements AudioEngine {
   private warmOscs: OscillatorNode[] = [];
 
   private muted = false;
-  private silenceTransitionMs = DEFAULT_SILENCE_MS * SILENCE_TC_FACTOR;
+  private silenceTransitionMs = SILENCE_MS * SILENCE_TC_FACTOR;
   private started = false;
   private disposed = false;
 
   constructor(opts?: { muted?: boolean; silenceMs?: number }) {
     this.muted = opts?.muted ?? false;
     // 过渡时长跟随 SILENCE_MS 缩放（含移动端 3000ms / 演出减速 ×1.5），确保音画同步
-    this.silenceTransitionMs = (opts?.silenceMs ?? DEFAULT_SILENCE_MS) * SILENCE_TC_FACTOR;
+    this.silenceTransitionMs = (opts?.silenceMs ?? SILENCE_MS) * SILENCE_TC_FACTOR;
   }
 
   start(): void {
@@ -346,7 +351,7 @@ class WebAudioEngine implements AudioEngine {
  * 因此本函数本身在测试 / SSR 环境下也安全、不抛错。
  *
  * @param opts.muted     主静音开关（默认 false）
- * @param opts.silenceMs 沉默三秒时长（ms），默认 2800；音频过渡 = silenceMs×0.16
+ * @param opts.silenceMs 沉默三秒时长（ms），默认 SILENCE_MS（2600）；音频过渡 = silenceMs×0.16
  *                       自动跟随，供移动端(3000)/演出减速(×1.5→4200)透传缩放。
  */
 export function createAudioEngine(opts?: { muted?: boolean; silenceMs?: number }): AudioEngine {

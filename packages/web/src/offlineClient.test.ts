@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { offlineApi } from './offlineClient';
 import { loopEvents } from './content/livingTown';
+import type { AnswerMode } from '@lunhui/engine/types';
 import type { AskResponse } from './api';
 
 describe('offlineClient 确定性判定（零 token / 零后端）', () => {
@@ -26,7 +27,8 @@ describe('offlineClient 确定性判定（零 token / 零后端）', () => {
     expect(typeof res.loopId).toBe('number');
     expect(typeof res.sequence).toBe('number');
     expect(typeof res.answer).toBe('string');
-    expect(['direct', 'deny', 'silence', 'rhetoric']).toContain(res.answerMode);
+    // 类型级绑定：AnswerMode 扩展时此处编译失败，杜绝手抄漂移
+    expect(['direct', 'deny', 'silence', 'rhetoric'] as AnswerMode[]).toContain(res.answerMode);
     expect(typeof res.pause).toBe('boolean');
     expect(typeof res.questionsLeft).toBe('number');
     expect(typeof res.usedLlm).toBe('boolean');

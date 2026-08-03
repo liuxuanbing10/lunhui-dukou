@@ -1,6 +1,6 @@
 # 轮回渡口 · 未来规划与阶段性执行清单（Roadmap）
 
-> 主理人（游承峰）汇编 · 关联：`DEV_PLAN.md`（总体规划）、`art-style-standard-2.5d.md`（已定稿视觉标准）、`PROJECT_ANALYSIS.md`（现状诊断）
+> 主理人（游承峰）汇编 · 关联：`SPEC.md`（产品全案）、`art-style-standard-2.5d.md`（已定稿视觉标准）、`DEV_EXPERIENCE.md`（实战经验与现状沉淀）
 > 文档状态：**v1 定稿** ｜ 更新：2026-08-03
 > 统一视觉标准已锁定：**2.5D**（2D 动态插画+立绘 为基底 + 伪 3D 演出），不采真 3D。
 

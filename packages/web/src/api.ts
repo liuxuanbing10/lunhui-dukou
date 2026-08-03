@@ -5,6 +5,7 @@
  * 自动回退到 offlineClient（零后端 / 零 LLM token 的确定性判定），保证 web 直接可玩。
  */
 import { offlineApi } from './offlineClient';
+import type { AnswerMode } from '@lunhui/engine/types';
 
 export interface LoopResponse {
   loopId: number;
@@ -19,7 +20,7 @@ export interface AskResponse {
   loopId: number;
   sequence: number;
   answer: string;
-  answerMode: 'direct' | 'deny' | 'silence' | 'rhetoric';
+  answerMode: AnswerMode;
   hitFactId?: string;
   pause: boolean;
   questionsLeft: number;

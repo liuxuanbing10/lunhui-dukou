@@ -10,6 +10,7 @@ import {
   addQuestion,
   addMemory,
   getMemories,
+  getStrongMemories,
   decayMemories,
   addEvent,
   getEvents,
@@ -107,6 +108,22 @@ describe('repository', () => {
     >;
     expect(JSON.parse(row.flags as string)).toEqual({ key: 'v' });
     expect(JSON.parse(row.active_residents as string)).toEqual(['r1', 'r2']);
+  });
+
+  it('玩家强记忆：getStrongMemories（≥0.3、永久优先、≤20）', () => {
+    seedResidents(testDb);
+    const loopId = createLoop(testDb, 1);
+    addMemory(testDb, 'r1', loopId, '永久记忆', true);
+    addMemory(testDb, 'r2', loopId, '强记忆', false);
+    // 手动制造一条弱记忆（strength 0.1 < 0.3 阈值，应被过滤）
+    testDb.prepare('UPDATE memories SET strength = 0.1 WHERE content = ?').run('强记忆');
+    addMemory(testDb, 'r3', loopId, '另一条强记忆', false);
+
+    const strong = getStrongMemories(testDb);
+    expect(strong.length).toBe(2);
+    // 永久优先
+    expect(strong[0]?.content).toBe('永久记忆');
+    expect(strong.every((m) => m.strength >= 0.3)).toBe(true);
   });
 
   it('wipeAll 清空全部', () => {

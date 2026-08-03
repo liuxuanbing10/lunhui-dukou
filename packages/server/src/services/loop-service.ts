@@ -7,6 +7,7 @@
  */
 import type { Database } from 'better-sqlite3';
 import { judgeAsk } from '@lunhui/engine';
+import type { AnswerMode } from '@lunhui/engine';
 import { generateAnswer } from './llm-generator.js';
 import {
   addEvent,
@@ -21,6 +22,7 @@ import {
   getLatestLoop,
   getLoop,
   getResidentRow,
+  getStrongMemories,
   saveWorldState,
 } from '../db/repository.js';
 import { getDb } from '../db/index.js';
@@ -33,7 +35,7 @@ export interface AskOutcome {
   loopId: number;
   sequence: number;
   answer: string;
-  answerMode: 'direct' | 'deny' | 'silence' | 'rhetoric';
+  answerMode: AnswerMode;
   hitFactId?: string;
   pause: boolean;
   questionsLeft: number;
@@ -206,19 +208,13 @@ export function makeChoice(
   return { accepted: true, consequence, loopStatus: 'ended' };
 }
 
-/** 玩家记忆查询 */
+/** 玩家记忆查询（数据访问收编进 repository.getStrongMemories） */
 export function playerMemory(db: Database = getDb()): Array<{
   content: string;
   strength: number;
   loop_id: number | null;
 }> {
-  const rows = db
-    .prepare(
-      `SELECT content, strength, loop_id FROM memories
-       WHERE strength >= 0.3 ORDER BY is_permanent DESC, strength DESC LIMIT 20`,
-    )
-    .all() as Array<{ content: string; strength: number; loop_id: number | null }>;
-  return rows;
+  return getStrongMemories(db);
 }
 
 export { getEvents };
