@@ -44,8 +44,10 @@ const WARM_FREQ_A = 65; // 低频正弦（sub）
 const WARM_FREQ_B = 98; // 三角波（暖色泛音，约纯五度）
 const WARM_SILENCE = 0.03; // 沉默段稍压暗但保留
 
-// 沉默三秒过渡时间常数（平滑、无爆音）
-const SILENCE_TC = 0.6;
+// 沉默过渡时间系数：音频收敛时长 = silenceMs × 该系数（默认 2800×0.16≈448ms），
+// 确保落进视觉 T1(0–500ms) 暖光收束窗口内同帧（对齐 art-style §5.1）。
+const SILENCE_TC_FACTOR = 0.16;
+const DEFAULT_SILENCE_MS = 2800;
 
 // 命中真相：克制钟鸣
 const REVEAL_F = 523.25; // C5 基频
@@ -99,6 +101,13 @@ function safeDisconnect(node: AudioNode | null): void {
   }
 }
 
+/** 在 dur 秒内将增益线性平滑到 target（落点精确、无爆音）。 */
+function rampGainTo(param: AudioParam, target: number, t: number, dur: number): void {
+  param.cancelScheduledValues(t);
+  param.setValueAtTime(param.value, t);
+  param.linearRampToValueAtTime(target, t + dur);
+}
+
 class WebAudioEngine implements AudioEngine {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
@@ -112,11 +121,14 @@ class WebAudioEngine implements AudioEngine {
   private warmOscs: OscillatorNode[] = [];
 
   private muted = false;
+  private silenceTransitionMs = DEFAULT_SILENCE_MS * SILENCE_TC_FACTOR;
   private started = false;
   private disposed = false;
 
-  constructor(opts?: { muted?: boolean }) {
+  constructor(opts?: { muted?: boolean; silenceMs?: number }) {
     this.muted = opts?.muted ?? false;
+    // 过渡时长跟随 SILENCE_MS 缩放（含移动端 3000ms / 演出减速 ×1.5），确保音画同步
+    this.silenceTransitionMs = (opts?.silenceMs ?? DEFAULT_SILENCE_MS) * SILENCE_TC_FACTOR;
   }
 
   start(): void {
@@ -153,8 +165,9 @@ class WebAudioEngine implements AudioEngine {
   setSilence(active: boolean): void {
     if (!this.ctx || this.disposed || !this.rainGain || !this.warmGain) return;
     const t = this.ctx.currentTime;
-    this.rainGain.gain.setTargetAtTime(active ? RAIN_SILENCE : RAIN_BASE, t, SILENCE_TC);
-    this.warmGain.gain.setTargetAtTime(active ? WARM_SILENCE : WARM_BASE, t, SILENCE_TC);
+    const dur = this.silenceTransitionMs / 1000;
+    rampGainTo(this.rainGain.gain, active ? RAIN_SILENCE : RAIN_BASE, t, dur);
+    rampGainTo(this.warmGain.gain, active ? WARM_SILENCE : WARM_BASE, t, dur);
   }
 
   playReveal(): void {

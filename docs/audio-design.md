@@ -75,7 +75,7 @@
 | 阶段 | 时序 | 音频动作 | 视觉联动（art-style §5.1） |
 |---|---|---|---|
 | T0 命中 | 0 ms | 文本结束；若需要，预置 `playReveal` 在收束点触发 | 立绘切 `face_hit` |
-| T1 收束 | 0–500 ms | 调 `setSilence(true)`：雨声 0.16→0.012、暖光 pad 0.045→0.03（TC≈0.6s 平滑）；暖光收束同步一声低频「水声点」 | 冷蓝淡出至 ~20%，暖光收束（§4.2） |
+| T1 收束 | 0–500 ms | 调 `setSilence(true)`：雨声 0.16→0.012、暖光 pad 0.045→0.03（过渡 ≈448ms = SILENCE_MS×0.16，落进本窗口内与暖光收束同帧）；暖光收束同步一声低频「水声点」 | 冷蓝淡出至 ~20%，暖光收束（§4.2） |
 | T2 沉默 | 500–2800 ms | **汤主沉默三秒**：仅保留压暗的暖光 pad + 近乎静默的雨声；无点效、无输入 | 无文本/输入，镜头微推，记忆碎片叠影淡入（§4.4） |
 | T3 回落 | 2800–3600 ms | 调 `setSilence(false)`：雨声/暖光平滑回升至常态 | 暖光回落，冷蓝回归，允许继续输入 |
 
@@ -88,6 +88,8 @@ engine.setSilence(true);   // 进入沉默三秒
 engine.setSilence(false);  // 退出沉默三秒
 ```
 
+> **缩放契约（校准 #2）**：音频过渡时长 = `silenceMs × 0.16`，由 `createAudioEngine({ silenceMs })` 透传。演出层须把**已缩放**的 `SILENCE_MS`（移动端 3000 / 演出减速 ×1.5 → 4200）传给 `silenceMs`，音频过渡即随之缩放，与暖光收束窗口始终同步。
+
 演出层**必须预留 `onSilenceStart / onSilenceEnd` 钩子**（art-style §5.4），音频在这两个钩子里切换 `setSilence`，确保音画同帧。
 
 ---
@@ -98,7 +100,7 @@ engine.setSilence(false);  // 退出沉默三秒
 
 1. **打字机不驱动点效**：`playReveal` / `playReject` 仅由语义事件（`isKey` / 否定标记）触发，不由字符流触发，避免噪声化。
 2. **标点停顿 = 微呼吸**：可在句号/问号停顿处让雨声 LFO 轻微加深（可选），但默认保持平稳，留白优先。
-3. **节奏倍率联动**：art-style §6.5「演出减速 ×1.5」开关应同步作用到 `SILENCE_MS` 与 `playReveal` 衰减时长（建议 `REVEAL_DUR` 随之延长），保证音画同步放缓。
+3. **节奏倍率联动**：art-style §6.5「演出减速 ×1.5」开关应同步作用到 `SILENCE_MS` 与 `playReveal` 衰减时长（建议 `REVEAL_DUR` 随之延长），保证音画同步放缓。其中沉默过渡通过 `createAudioEngine({ silenceMs })` 透传缩放后的 `SILENCE_MS` 自动跟随，无需单独调参。
 4. **手持回退**：LLM 超时/失败时，演出层应保留环境音床不中断，仅跳过事件点效——音频绝不应因生成失败而静默或报错（引擎全程 guard，缺 AudioContext/未 start 均 no-op）。
 
 ---
