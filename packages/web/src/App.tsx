@@ -3,6 +3,7 @@ import { api, type LoopResponse, type AskResponse } from './api';
 import { residentName } from './residents';
 import { useTypewriter } from './hooks/useTypewriter';
 import { injectThemeVars } from './visual/theme';
+import { createAudioEngine, type AudioEngine } from './audio/audio';
 import { Rain } from './components/Rain';
 import { AskingPhase } from './components/AskingPhase';
 import { ChoicePhase } from './components/ChoicePhase';
@@ -11,7 +12,8 @@ import { MemoryPhase } from './components/MemoryPhase';
 import './styles.css';
 
 // 视觉主题由 visual/theme 接管：App 启动注入 CSS 变量；RainNight 改用 theme token。
-// 音频引擎与活镇内容接入见后续步骤。
+// 音频引擎已在下方接入（createAudioEngine + 用户手势 start + 沉默/命中控制 + 卸载 dispose）。
+// 活镇内容（livingTownResidents / loopEvents / memoryRevenge）接入见后续步骤。
 import { RainNight, type RainMode } from './scene/RainNight';
 
 type Phase = 'boot' | 'intro' | 'choice' | 'death' | 'memory';
@@ -32,9 +34,27 @@ export function App() {
   const [silenceActive, setSilenceActive] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // 音频引擎：惰性创建、用户手势内 start，卸载时 dispose（测试环境无 AudioContext，全部 no-op）
+  const audioRef = useRef<AudioEngine | null>(null);
+  const ensureAudio = (): AudioEngine => {
+    if (!audioRef.current) {
+      audioRef.current = createAudioEngine();
+      audioRef.current.start();
+    }
+    return audioRef.current;
+  };
+
   // 注入视觉主题 CSS 变量（visual/theme 的 token → :root 自定义属性，幂等、测试安全）
   useEffect(() => {
     injectThemeVars();
+  }, []);
+
+  // 卸载时关停音频引擎（close AudioContext、断开节点）
+  useEffect(() => {
+    return () => {
+      audioRef.current?.dispose();
+      audioRef.current = null;
+    };
   }, []);
 
   const typewriter = useTypewriter(dialogText, 35, phase === 'intro');
@@ -60,17 +80,22 @@ export function App() {
   const handleAsk = useCallback(async () => {
     if (!loop || !question.trim() || busy) return;
     setBusy(true);
+    // 用户手势（点击「问」）内首次惰性启动音频引擎
+    const audio = ensureAudio();
     try {
       const res: AskResponse = await api.ask(loop.loopId, selected, question.trim());
       setDialogSpeaker(residentName(selected));
       setDialogText(res.answer);
       setQuestionsLeft(res.questionsLeft);
       setQuestion('');
-      // 命中关键 → 进入「沉默三秒」留白（RainNight silence 收束），再落到选择分支
+      // 命中关键 → 进入「沉默三秒」留白（RainNight silence 收束 + 音频渐弱 + 钟鸣泛音），再落到选择分支
       if (res.hitFactId && res.pause) {
         setSilenceActive(true);
+        audio.setSilence(true);
+        audio.playReveal();
         window.setTimeout(() => {
           setSilenceActive(false);
+          audio.setSilence(false);
           setPhase('choice');
         }, 2600);
       } else if (res.questionsLeft <= 0) {
