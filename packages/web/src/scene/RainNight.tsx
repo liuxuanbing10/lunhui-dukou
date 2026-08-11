@@ -30,14 +30,14 @@ export type RainMode = 'idle' | 'silence' | 'memory';
  * r1 用写实立绘 billboard；其余暂用剪影人形（立绘生产后逐个替换）。
  */
 const RESIDENT_SPOTS: Array<{ id: string; pos: [number, number, number] }> = [
-  { id: 'r1', pos: [0.85, 0, 0.1] }, // 栈桥汤碗旁（立绘，屏幕内已验证）
-  { id: 'r2', pos: [2.0, 0, -0.5] }, // 栈桥右侧中景
-  { id: 'r3', pos: [-2.0, 0, -0.5] }, // 栈桥左侧中景
-  { id: 'r4', pos: [-0.8, 0, -2.2] }, // 左中远
-  { id: 'r5', pos: [1.6, 0, -2.4] }, // 右中远
-  { id: 'r6', pos: [3.0, 0, -1.6] }, // 渡船边
-  { id: 'r7', pos: [-2.4, 0, -1.2] }, // 左
-  { id: 'r8', pos: [0.4, 0, -3.4] }, // 中央远（钟楼方向）
+  { id: 'r1', pos: [0.85, 0, 0.1] }, // 渡口栈桥（立绘）
+  { id: 'r2', pos: [3.5, 0, 2.2] }, // 右岸花店前
+  { id: 'r3', pos: [-5.2, 0, 1.2] }, // 左岸面馆前
+  { id: 'r4', pos: [-4.2, 0, -1.6] }, // 左岸纸扎铺
+  { id: 'r5', pos: [4.6, 0, -0.4] }, // 右岸钟表铺
+  { id: 'r6', pos: [-1.8, 0, 3.0] }, // 乌篷船边
+  { id: 'r7', pos: [-1.6, 0, -6.0] }, // 石拱桥桥头
+  { id: 'r8', pos: [4.0, 0, -3.2] }, // 巷口
 ];
 
 /** 剪影人形（未出立绘的居民占位；点击选中） */
@@ -580,7 +580,7 @@ export function RainNight({
       gl={{ antialias: true, powerPreference: 'high-performance' }}
     >
       <color attach="background" args={[theme.rain.base]} />
-      <fog attach="fog" args={[theme.rain.base, 8, 22]} />
+      <fog attach="fog" args={[theme.rain.base, 12, 32]} />
       <RainScene
         mode={mode}
         portraitVariant={portraitVariant}
