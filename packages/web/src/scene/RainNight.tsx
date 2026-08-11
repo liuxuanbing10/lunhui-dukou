@@ -22,6 +22,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { theme } from '../visual/theme';
 import { resolveMove, isWalkable } from './walkable';
+import { wallTexture, roofTexture, stoneTexture, woodTexture } from './textures';
 
 export type RainMode = 'idle' | 'silence' | 'memory';
 
@@ -154,7 +155,10 @@ function DukouModel() {
       const loader = new GLTFLoader();
       loader.load(
         '/src/assets/scene/dukou.glb',
-        (gltf) => setScene(gltf.scene),
+        (gltf) => {
+          applyVillageTextures(gltf.scene);
+          setScene(gltf.scene);
+        },
         undefined,
         (e) => console.error('[scene] GLB 加载失败', e),
       );
@@ -165,6 +169,51 @@ function DukouModel() {
   }, []);
   if (!scene) return null;
   return <primitive object={scene} />;
+}
+
+/**
+ * 阶段 1 材质写实化：按对象名给 GLB 程序化 PBR 纹理（对照 R2/R3 参考图）。
+ * 白墙斑驳 / 黛瓦瓦楞 / 湿石板 / 湿木；窗灯/灯笼 emissive 保持。
+ */
+function applyVillageTextures(root: THREE.Object3D) {
+  const wallTex = wallTexture();
+  const roofTex = roofTexture();
+  const stoneTex = stoneTexture();
+  const woodTex = woodTexture();
+  root.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    // 阶段 2：开阴影投射/接收（汤碗暖光实时阴影）
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    const mat = mesh.material as THREE.MeshStandardMaterial;
+    if (!mat || !mat.isMeshStandardMaterial) return;
+    const n = mesh.name;
+    if (n.includes('_win') || n.includes('lantern') || n.includes('_glow') || n.includes('soup') || n.includes('clock')) {
+      return; // 发光物件不换纹理
+    }
+    if (n.includes('_wall') || n.includes('_gable')) {
+      mat.map = wallTex;
+      mat.roughness = 0.72; // 湿墙微反光
+    } else if (n.includes('_roof') || n.includes('_ridge') || n.includes('_tile') || n.includes('_eave')) {
+      mat.map = roofTex;
+      mat.roughness = 0.55;
+    } else if (
+      n.includes('road') ||
+      n.includes('plaza') ||
+      n.includes('lane') ||
+      n.includes('_step') ||
+      n.includes('bridge') ||
+      n.includes('plank')
+    ) {
+      mat.map = stoneTex;
+      mat.roughness = 0.32; // 湿石板镜面感
+    } else if (n.includes('_base') || n.includes('post') || n.includes('_door') || n.includes('_pole')) {
+      mat.map = woodTex;
+      mat.roughness = 0.45; // 湿木
+    }
+    mat.needsUpdate = true;
+  });
 }
 
 
@@ -535,8 +584,19 @@ function RainScene({
   return (
     <>
       <ambientLight ref={ambientLight} intensity={0.12} />
+      {/* 阶段 2 光照：半球光（天蓝/地暗体积感）+ 汤碗暖光实时阴影 */}
+      <hemisphereLight args={['#2c3d4f', '#0a1018', 0.55]} />
       {/* 汤碗暖光：暖色点光（GLB 内含自发光汤碗 mesh，C1 资产到位后替换） */}
-      <pointLight ref={pointLight} color={theme.warm.soul} intensity={2.4} distance={14} position={[0, 0.6, 0]} />
+      <pointLight
+        ref={pointLight}
+        color={theme.warm.soul}
+        intensity={2.4}
+        distance={14}
+        position={[0, 0.6, 0]}
+        castShadow
+        shadow-mapSize={[1024, 1024]}
+        shadow-bias={-0.0012}
+      />
       {/* 汤碗 Bloom 焦点 halo（GLB 汤碗自发光之上叠加，保证后期发光焦点） */}
       <mesh position={[0, 0.68, 0]}>
         <sphereGeometry args={[0.2, 12, 12]} />
@@ -609,7 +669,12 @@ export function RainNight({
       onPointerMissed={() => setFocus(null)}
       dpr={[1, 2]}
       camera={{ position: [0, 3.2, 9.5], fov: 55 }}
-      gl={{ antialias: true, powerPreference: 'high-performance' }}
+      gl={{
+        antialias: true,
+        powerPreference: 'high-performance',
+        toneMapping: THREE.ACESFilmicToneMapping,
+        toneMappingExposure: 1.15,
+      }}
     >
       <color attach="background" args={[theme.rain.base]} />
       <fog attach="fog" args={[theme.rain.base, 12, 32]} />
