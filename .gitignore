@@ -39,3 +39,4 @@ coverage/
 # Internal agent memory (not project source)
 .workbuddy/
 .playwright-mcp/
+.tmp-qwen/
