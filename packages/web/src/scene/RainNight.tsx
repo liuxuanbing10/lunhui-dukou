@@ -21,7 +21,6 @@ import { EffectComposer, Bloom, Vignette, Noise } from '@react-three/postprocess
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { theme } from '../visual/theme';
-import { portraitSrc, type PortraitVariant } from '../portraits';
 import { resolveMove, isWalkable } from './walkable';
 
 export type RainMode = 'idle' | 'silence' | 'memory';
@@ -41,26 +40,51 @@ const RESIDENT_SPOTS: Array<{ id: string; pos: [number, number, number] }> = [
   { id: 'r8', pos: [5.5, 0, 2.0] }, // 东桥南桥头（桥下避雨）
 ];
 
-/** 剪影人形（未出立绘的居民占位；点击选中） */
-function ResidentSilhouette({
+/**
+ * 居民色签（docs/AI_IMAGE_PROMPTS.md 角色色签表；3D 模型用同色系）
+ */
+const RESIDENT_COLORS: Record<string, [string, string]> = {
+  r1: ['#3d4f42', '#a8532f'], // 苔绿灰 / 锈红（蓑衣）
+  r2: ['#4a5b6e', '#b87d8a'], // 雾蓝 / 干玫瑰（花店）
+  r3: ['#6e5a3e', '#d8cdb4'], // 麦棕 / 面粉白（面馆）
+  r4: ['#c9c2b4', '#c0473b'], // 纸白 / 朱砂红（纸扎）
+  r5: ['#7a6242', '#8aa0b4'], // 古铜 / 钢蓝灰（钟表）
+  r6: ['#5a4232', '#c9b08a'], // 深棕 / 绳麻（渔夫）
+  r7: ['#2b3a52', '#b89a5a'], // 藏青 / 黄铜（夜巡）
+  r8: ['#7d93a8', '#d8a24a'], // 灰蓝 / 琥珀（小满）
+};
+
+/**
+ * 3D 居民模型（程序化人形：头/身/四肢，角色色签，受汤碗暖光）。
+ * 替代剪影占位——立体、受光、可微动；点击选中。
+ */
+function ResidentModel({
   id,
-  pos,
   selected,
   onSelect,
 }: {
   id: string;
-  pos: [number, number, number];
   selected: boolean;
-  onSelect: (id: string) => void;
+  onSelect: () => void;
 }) {
-  const bodyColor = selected ? '#2f5570' : '#1a2e42';
-  const headColor = selected ? '#3d6582' : '#203650';
+  const groupRef = useRef<THREE.Group>(null);
+  const [primary, accent] = RESIDENT_COLORS[id] ?? ['#4a5b6e', '#b87d8a'];
+
+  // 呼吸微动（站立起伏）
+  useFrame(({ clock }) => {
+    const g = groupRef.current;
+    if (!g) return;
+    const t = clock.getElapsedTime();
+    g.position.y = Math.sin(t * 1.8 + (id.charCodeAt(1) % 7)) * 0.015;
+  });
+
   return (
     <group
-      position={pos}
+      ref={groupRef}
+      position={[0, 0, 0]}
       onClick={(e) => {
         e.stopPropagation();
-        onSelect(id);
+        onSelect();
       }}
       onPointerOver={() => {
         document.body.style.cursor = 'pointer';
@@ -69,26 +93,55 @@ function ResidentSilhouette({
         document.body.style.cursor = 'auto';
       }}
     >
-      {/* 身体（蓑衣/长袍轮廓） */}
-      <mesh position={[0, 0.7, 0]}>
-        <cylinderGeometry args={[0.2, 0.28, 1.4, 8]} />
-        <meshBasicMaterial color={bodyColor} />
-      </mesh>
       {/* 头 */}
-      <mesh position={[0, 1.55, 0]}>
-        <sphereGeometry args={[0.17, 8, 8]} />
-        <meshBasicMaterial color={headColor} />
+      <mesh position={[0, 1.55, 0]} castShadow>
+        <sphereGeometry args={[0.17, 14, 12]} />
+        <meshStandardMaterial color={selected ? '#6d93b2' : primary} emissive={selected ? '#6d93b2' : primary} emissiveIntensity={0.5} roughness={0.85} />
       </mesh>
-      {/* 选中光环 */}
+      {/* 身体 */}
+      <mesh position={[0, 1.06, 0]} castShadow>
+        <boxGeometry args={[0.46, 0.58, 0.28]} />
+        <meshStandardMaterial color={primary} emissive={primary} emissiveIntensity={0.5} roughness={0.9} />
+      </mesh>
+      {/* 腰带（色签 accent） */}
+      <mesh position={[0, 0.8, 0]} castShadow>
+        <boxGeometry args={[0.48, 0.08, 0.3]} />
+        <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.35} roughness={0.8} />
+      </mesh>
+      {/* 腿 ×2 */}
+      <mesh position={[-0.14, 0.36, 0]} castShadow>
+        <cylinderGeometry args={[0.075, 0.085, 0.72, 8]} />
+        <meshStandardMaterial color={selected ? '#6d93b2' : primary} emissive={selected ? '#6d93b2' : primary} emissiveIntensity={0.5} roughness={0.9} />
+      </mesh>
+      <mesh position={[0.14, 0.36, 0]} castShadow>
+        <cylinderGeometry args={[0.075, 0.085, 0.72, 8]} />
+        <meshStandardMaterial color={selected ? '#6d93b2' : primary} emissive={selected ? '#6d93b2' : primary} emissiveIntensity={0.5} roughness={0.9} />
+      </mesh>
+      {/* 臂 ×2（微摆） */}
+      <mesh position={[-0.31, 1.28, 0]} rotation={[0.06, 0, 0.05]}>
+        <cylinderGeometry args={[0.05, 0.055, 0.5, 6]} />
+        <meshStandardMaterial color={primary} emissive={primary} emissiveIntensity={0.5} roughness={0.9} />
+      </mesh>
+      <mesh position={[0.31, 1.28, 0]} rotation={[0.06, 0, -0.05]}>
+        <cylinderGeometry args={[0.05, 0.055, 0.5, 6]} />
+        <meshStandardMaterial color={primary} emissive={primary} emissiveIntensity={0.5} roughness={0.9} />
+      </mesh>
+      {/* 选中光环（暖光地面圈） */}
       {selected && (
-        <mesh position={[0, 0.04, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[0.4, 0.52, 24]} />
-          <meshBasicMaterial color={theme.warm.glow} transparent opacity={0.75} toneMapped={false} />
+        <mesh position={[0, 0.03, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[0.42, 0.56, 28]} />
+          <meshBasicMaterial
+            color={theme.warm.glow}
+            transparent
+            opacity={0.75}
+            toneMapped={false}
+          />
         </mesh>
       )}
     </group>
   );
 }
+
 
 /**
  * 渡口小镇（Blender 建模 GLB：栈桥/建筑剪影/渡船/灯笼/汤碗台座）。
@@ -115,72 +168,6 @@ function DukouModel() {
 }
 
 
-/**
- * NPC billboard：居民立绘贴进 3D 场景（渡口汤碗旁），始终面向相机。
- * 切换贴图（换人/换表情）时通过 key 强制重挂载 → opacity 从 0 淡入。
- */
-function NpcBillboard({
-  textureUrl,
-  pos,
-  selected,
-  onSelect,
-}: {
-  textureUrl: string;
-  pos: [number, number, number];
-  selected: boolean;
-  onSelect: () => void;
-}) {
-  const [ready, setReady] = useState(false);
-  const texture = useMemo(() => {
-    const t = new THREE.TextureLoader().load(textureUrl, () => setReady(true));
-    t.colorSpace = THREE.SRGBColorSpace;
-    return t;
-  }, [textureUrl]);
-  const meshRef = useRef<THREE.Mesh>(null);
-
-  // billboard：每帧对齐相机朝向（纹理加载完成前不挂 mesh，避免挂起影响 EffectComposer）
-  useFrame(({ camera }) => {
-    if (meshRef.current) {
-      meshRef.current.quaternion.copy(camera.quaternion);
-    }
-  });
-
-  if (!ready) return null;
-  return (
-    <mesh
-      ref={meshRef}
-      position={[pos[0], pos[1], pos[2]]}
-      onClick={(e) => {
-        e.stopPropagation();
-        onSelect();
-      }}
-      onPointerOver={() => {
-        document.body.style.cursor = 'pointer';
-      }}
-      onPointerOut={() => {
-        document.body.style.cursor = 'auto';
-      }}
-    >
-      <planeGeometry args={[1.25, 3.4]} />
-      <meshBasicMaterial
-        map={texture}
-        alphaMap={texture}
-        transparent
-        alphaTest={0.3}
-        depthWrite={false}
-        side={THREE.DoubleSide}
-        toneMapped={false}
-      />
-      {/* 选中光环 */}
-      {selected && (
-        <mesh position={[0, -1.68, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[0.45, 0.58, 24]} />
-          <meshBasicMaterial color={theme.warm.glow} transparent opacity={0.8} toneMapped={false} />
-        </mesh>
-      )}
-    </mesh>
-  );
-}
 
 // 雨滴数量（单 instancedMesh = 1 draw call；按设备像素比 dpr=[1,2] 自适应）
 const RAIN_COUNT = 900; // 水乡夜雨，密而不乱
@@ -267,7 +254,6 @@ const GHOSTS = [
 
 function RainScene({
   mode,
-  portraitVariant,
   selected,
   onSelectResident,
   focus,
@@ -275,7 +261,6 @@ function RainScene({
   onNearChange,
 }: {
   mode: RainMode;
-  portraitVariant: PortraitVariant;
   selected: string;
   onSelectResident: (id: string) => void;
   focus: { x: number; z: number } | null;
@@ -286,6 +271,35 @@ function RainScene({
   const nearRef = useRef<string | null>(null);
   // 行走后的相机位置：松开按键不回跳全景，停留在玩家所在处
   const walkPosRef = useRef<{ x: number; z: number } | null>(null);
+  // 视角朝向（yaw）：0 = 面向 -z；鼠标左键拖拽旋转
+  const yawRef = useRef(0);
+  const dragRef = useRef<{ x: number; y: number } | null>(null);
+
+  // 鼠标左键拖拽：旋转视角（yaw）；UI 面板区（.stage）不触发
+  useEffect(() => {
+    const down = (e: MouseEvent) => {
+      if (e.button !== 0) return;
+      if ((e.target as HTMLElement | null)?.closest('.stage')) return;
+      dragRef.current = { x: e.clientX, y: e.clientY };
+    };
+    const move = (e: MouseEvent) => {
+      if (!dragRef.current) return;
+      const dx = e.clientX - dragRef.current.x;
+      yawRef.current -= dx * 0.0042;
+      dragRef.current = { x: e.clientX, y: e.clientY };
+    };
+    const up = () => {
+      dragRef.current = null;
+    };
+    window.addEventListener('mousedown', down);
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+    return () => {
+      window.removeEventListener('mousedown', down);
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', up);
+    };
+  }, []);
 
   // WASD 行走（第一人称平移；行走打断镜头焦点）
   useEffect(() => {
@@ -386,10 +400,28 @@ function RainScene({
       }
       let dx = 0;
       let dz = 0;
-      if (keys.w) dz -= speed;
-      if (keys.s) dz += speed;
-      if (keys.a) dx -= speed;
-      if (keys.d) dx += speed;
+      // 移动方向相对视角 yaw（WASD = 前/后/左/右）
+      const yaw = yawRef.current;
+      const fwdX = Math.sin(yaw);
+      const fwdZ = -Math.cos(yaw);
+      const rgtX = Math.cos(yaw);
+      const rgtZ = Math.sin(yaw);
+      if (keys.w) {
+        dx += fwdX * speed;
+        dz += fwdZ * speed;
+      }
+      if (keys.s) {
+        dx -= fwdX * speed;
+        dz -= fwdZ * speed;
+      }
+      if (keys.a) {
+        dx -= rgtX * speed;
+        dz -= rgtZ * speed;
+      }
+      if (keys.d) {
+        dx += rgtX * speed;
+        dz += rgtZ * speed;
+      }
       // 可行走区域约束（禁止穿建筑/水面，贴边滑动）
       const next = resolveMove(
         { x: camera.position.x, z: camera.position.z },
@@ -399,7 +431,11 @@ function RainScene({
       camera.position.x = next.x;
       camera.position.z = next.z;
       camera.position.y = 1.9; // 步行高度（沿河街/广场/桥面）
-      camera.lookAt(camera.position.x, 0.9, camera.position.z - 8);
+      camera.lookAt(
+        camera.position.x + fwdX * 8,
+        0.9,
+        camera.position.z + fwdZ * 8,
+      );
       walkPosRef.current = { x: camera.position.x, z: camera.position.z };
     } else if (mode !== 'silence' && focus) {
       walkPosRef.current = null; // 对话镜头接管，退出行走位置
@@ -536,49 +572,30 @@ function RainScene({
       </instancedMesh>
 
       {/* 居民立绘（billboard）：站在渡口汤碗旁，始终面向玩家 */}
-      {/* 场景居民：有立绘的用 billboard（selected 用表情变体），其余剪影；点击选中 */}
-      {RESIDENT_SPOTS.map((s) => {
-        const tex = portraitSrc(s.id, s.id === selected ? portraitVariant : 'body');
-        if (tex) {
-          return (
-            <NpcBillboard
-              key={s.id === selected ? `${s.id}-${portraitVariant}` : s.id}
-              textureUrl={tex}
-              pos={[s.pos[0], 1.72, s.pos[2]]}
-              selected={selected === s.id}
-              onSelect={() => {
-                onSelectResident(s.id);
-                onFocusChange({ x: s.pos[0], z: s.pos[2] });
-              }}
-            />
-          );
-        }
-        return (
-          <ResidentSilhouette
-            key={s.id}
+      {/* 场景居民：3D 立体人形（角色色签，受汤碗暖光），点击选中 */}
+      {RESIDENT_SPOTS.map((s) => (
+        <group key={s.id} position={[s.pos[0], 0, s.pos[2]]}>
+          <ResidentModel
             id={s.id}
-            pos={s.pos}
             selected={selected === s.id}
-            onSelect={(id) => {
-              onSelectResident(id);
+            onSelect={() => {
               onFocusChange({ x: s.pos[0], z: s.pos[2] });
+              onSelectResident(s.id);
             }}
           />
-        );
-      })}
+        </group>
+      ))}
     </>
   );
 }
 
 export function RainNight({
   mode,
-  portraitVariant = 'body',
   selected = 'r1',
   onSelectResident,
   onNearChange,
 }: {
   mode: RainMode;
-  portraitVariant?: PortraitVariant;
   selected?: string;
   onSelectResident?: (id: string) => void;
   onNearChange?: (id: string | null) => void;
@@ -598,7 +615,6 @@ export function RainNight({
       <fog attach="fog" args={[theme.rain.base, 12, 32]} />
       <RainScene
         mode={mode}
-        portraitVariant={portraitVariant}
         selected={selected}
         onSelectResident={onSelectResident ?? (() => {})}
         focus={focus}

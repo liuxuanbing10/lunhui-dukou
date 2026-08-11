@@ -10,7 +10,6 @@ import { AskingPhase } from './components/AskingPhase';
 import { ChoicePhase } from './components/ChoicePhase';
 import { DeathPhase } from './components/DeathPhase';
 import { MemoryPhase } from './components/MemoryPhase';
-import type { PortraitVariant } from './portraits';
 import { DEATH_LINES } from '@lunhui/engine/death-lines';
 import './styles.css';
 
@@ -41,7 +40,6 @@ export function App() {
   // 「沉默三秒」留白态：命中关键事实时触发，驱动 RainNight 进入 silence 收束
   const [silenceActive, setSilenceActive] = useState(false);
   // 当前居民立绘表情（命中关键 → face_hit；未命中保守回应 → face_pressed；其余 body）
-  const [portraitVariant, setPortraitVariant] = useState<PortraitVariant>('body');
   // 跑图近身：场景中距离最近的人物（< 2 单位时提示"按 F 对话"）
   const [nearResident, setNearResident] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -112,10 +110,6 @@ export function App() {
       setDialogText(res.answer);
       setQuestionsLeft(res.questionsLeft);
       setQuestion('');
-      // 立绘表情联动：命中真相 → face_hit；沉默拒绝 → face_pressed；正常对话 → body
-      setPortraitVariant(
-        res.hitFactId ? 'face_hit' : res.answerMode === 'silence' ? 'face_pressed' : 'body',
-      );
       // 命中关键 → 进入「沉默三秒」留白（RainNight silence 收束 + 音频渐弱 + 钟鸣泛音），再落到选择分支
       if (res.hitFactId && res.pause) {
         setSilenceActive(true);
@@ -183,7 +177,6 @@ export function App() {
   // 场景点击选人（替代居民按钮）；换人重置表情为 body
   const handleSelectResident = (id: string) => {
     setSelected(id);
-    setPortraitVariant('body');
   };
 
   // RainNight 视觉模式：由当前相位推导（命中关键 → silence 收束；memory 相位 → 记忆叠影；其余 idle）
@@ -194,7 +187,6 @@ export function App() {
       <Suspense fallback={null}>
         <RainNight
           mode={rainMode}
-          portraitVariant={portraitVariant}
           selected={selected}
           onSelectResident={handleSelectResident}
           onNearChange={setNearResident}
