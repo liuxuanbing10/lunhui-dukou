@@ -51,8 +51,8 @@ function ResidentSilhouette({
   selected: boolean;
   onSelect: (id: string) => void;
 }) {
-  const bodyColor = selected ? '#27485e' : '#0d1826';
-  const headColor = selected ? '#33576e' : '#101d2c';
+  const bodyColor = selected ? '#2f5570' : '#1a2e42';
+  const headColor = selected ? '#3d6582' : '#203650';
   return (
     <group
       position={pos}
@@ -266,12 +266,53 @@ function RainScene({
   npcTexture,
   selected,
   onSelectResident,
+  focus,
+  onFocusChange,
+  onNearChange,
 }: {
   mode: RainMode;
   npcTexture: string | null;
   selected: string;
   onSelectResident: (id: string) => void;
+  focus: { x: number; z: number } | null;
+  onFocusChange: (f: { x: number; z: number } | null) => void;
+  onNearChange: (id: string | null) => void;
 }) {
+  const keysRef = useRef({ w: false, a: false, s: false, d: false });
+  const nearRef = useRef<string | null>(null);
+  // 行走后的相机位置：松开按键不回跳全景，停留在玩家所在处
+  const walkPosRef = useRef<{ x: number; z: number } | null>(null);
+
+  // WASD 行走（第一人称平移；行走打断镜头焦点）
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      const k = e.key.toLowerCase();
+      if (k === 'w' || k === 'a' || k === 's' || k === 'd') {
+        keysRef.current[k] = true;
+        onFocusChange(null);
+      }
+    };
+    const up = (e: KeyboardEvent) => {
+      const k = e.key.toLowerCase();
+      if (k === 'w' || k === 'a' || k === 's' || k === 'd') {
+        keysRef.current[k] = false;
+      }
+    };
+    window.addEventListener('keydown', down);
+    window.addEventListener('keyup', up);
+    return () => {
+      window.removeEventListener('keydown', down);
+      window.removeEventListener('keyup', up);
+    };
+  }, [onFocusChange]);
+
+  // 选中变化 → 镜头自动推近面对（点击人物 / F 键对话统一生效）
+  useEffect(() => {
+    const spot = RESIDENT_SPOTS.find((s) => s.id === selected);
+    if (spot) {
+      onFocusChange({ x: spot.pos[0], z: spot.pos[2] });
+    }
+  }, [selected, onFocusChange]);
   const rainRef = useRef<THREE.InstancedMesh>(null);
   const rainMat = useRef<THREE.MeshBasicMaterial>(null);
   const pointLight = useRef<THREE.PointLight>(null);
@@ -329,14 +370,60 @@ function RainScene({
     rippleMat.uniforms.uPulse!.value =
       mode === 'silence' ? Math.max(pulseRef.current, 0.35) : pulseRef.current;
 
-    // 相机视差（景深感，不晃眼；silence 时推近面对渡口）
-    const targetX = mode === 'silence' ? 0 : Math.sin(t * 0.3) * 0.7;
-    const targetZ = mode === 'silence' ? 4.6 : 8.2 + Math.sin(t * 0.22) * 0.5;
-    const targetY = mode === 'silence' ? 1.45 : 1.9;
-    camera.position.x += (targetX - camera.position.x) * k;
-    camera.position.y += (targetY - camera.position.y) * k;
-    camera.position.z += (targetZ - camera.position.z) * k;
-    camera.lookAt(0, 0.9, -0.6);
+    // 相机：WASD 行走（第一人称）> 选中人物推近 > silence 推近渡口 > 全景缓动
+    const keys = keysRef.current;
+    const moving = keys.w || keys.a || keys.s || keys.d;
+    if (moving) {
+      const speed = dt * 4.0;
+      if (keys.w) camera.position.z -= speed;
+      if (keys.s) camera.position.z += speed;
+      if (keys.a) camera.position.x -= speed;
+      if (keys.d) camera.position.x += speed;
+      // 渡口区域边界
+      camera.position.x = Math.max(-4.5, Math.min(4.5, camera.position.x));
+      camera.position.z = Math.max(-8.5, Math.min(3.5, camera.position.z));
+      camera.lookAt(camera.position.x, 0.9, camera.position.z - 8);
+      walkPosRef.current = { x: camera.position.x, z: camera.position.z };
+    } else if (mode !== 'silence' && focus) {
+      walkPosRef.current = null; // 对话镜头接管，退出行走位置
+      const k = Math.min(1, dt * 2.2);
+      const tx = focus.x * 0.55;
+      const ty = 1.55;
+      const tz = focus.z + 2.6;
+      camera.position.x += (tx - camera.position.x) * k;
+      camera.position.y += (ty - camera.position.y) * k;
+      camera.position.z += (tz - camera.position.z) * k;
+      camera.lookAt(focus.x, 1.45, focus.z);
+    } else {
+      if (mode !== 'silence' && walkPosRef.current) {
+        // 保持行走位置（不回跳全景）
+        camera.lookAt(camera.position.x, 0.9, camera.position.z - 8);
+      } else {
+        const targetX = mode === 'silence' ? 0 : Math.sin(t * 0.3) * 0.7;
+        const targetZ = mode === 'silence' ? 4.6 : 8.2 + Math.sin(t * 0.22) * 0.5;
+        const targetY = mode === 'silence' ? 1.45 : 1.9;
+        camera.position.x += (targetX - camera.position.x) * k;
+        camera.position.y += (targetY - camera.position.y) * k;
+        camera.position.z += (targetZ - camera.position.z) * k;
+        camera.lookAt(0, 0.9, -0.6);
+      }
+    }
+
+    // 近身检测：最近人物 < 2 单位 → 通知 App 显示"按 F 对话"
+    let nearest: { id: string; dist: number } | null = null;
+    for (const s of RESIDENT_SPOTS) {
+      const dx = camera.position.x - s.pos[0];
+      const dz = camera.position.z - s.pos[2];
+      const dist = Math.hypot(dx, dz);
+      if (dist < 2.0 && (!nearest || dist < nearest.dist)) {
+        nearest = { id: s.id, dist };
+      }
+    }
+    const nearId = nearest?.id ?? null;
+    if (nearId !== nearRef.current) {
+      nearRef.current = nearId;
+      onNearChange(nearId);
+    }
 
     // 雨：下落并回收（silence 段减弱雨势）
     const mesh = rainRef.current;
@@ -438,7 +525,10 @@ function RainScene({
           id={s.id}
           pos={s.pos}
           selected={selected === s.id}
-          onSelect={onSelectResident}
+          onSelect={(id) => {
+            onSelectResident(id);
+            onFocusChange({ x: s.pos[0], z: s.pos[2] });
+          }}
         />
       ))}
       {npcTexture && (
@@ -446,7 +536,10 @@ function RainScene({
           key={npcTexture}
           textureUrl={npcTexture}
           selected={selected === 'r1'}
-          onSelect={() => onSelectResident('r1')}
+          onSelect={() => {
+            onSelectResident('r1');
+            onFocusChange({ x: 0.85, z: 0.1 });
+          }}
         />
       )}
     </>
@@ -458,16 +551,21 @@ export function RainNight({
   npcTexture = null,
   selected = 'r1',
   onSelectResident,
+  onNearChange,
 }: {
   mode: RainMode;
   npcTexture?: string | null;
   selected?: string;
   onSelectResident?: (id: string) => void;
+  onNearChange?: (id: string | null) => void;
 }) {
+  // 镜头焦点：点击人物后推近面对；点击空白恢复全景
+  const [focus, setFocus] = useState<{ x: number; z: number } | null>(null);
   return (
     <Canvas
       // 固定全屏、置于相位 UI 之下（UI z-index:1）；开启指针事件以支持"点击场景人物"
       style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'auto' }}
+      onPointerMissed={() => setFocus(null)}
       dpr={[1, 2]}
       camera={{ position: [0, 1.9, 8.5], fov: 50 }}
       gl={{ antialias: true, powerPreference: 'high-performance' }}
@@ -479,6 +577,9 @@ export function RainNight({
         npcTexture={npcTexture}
         selected={selected}
         onSelectResident={onSelectResident ?? (() => {})}
+        focus={focus}
+        onFocusChange={setFocus}
+        onNearChange={onNearChange ?? (() => {})}
       />
       <EffectComposer>
         <Bloom

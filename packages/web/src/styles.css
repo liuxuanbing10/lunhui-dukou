@@ -195,6 +195,25 @@ body {
   letter-spacing: 0.1em;
 }
 
+/* ---- 跑图近身提示（靠近人物时"按 F 对话"） ---- */
+.near-hint {
+  position: fixed;
+  left: 50%;
+  bottom: 200px;
+  transform: translateX(-50%);
+  z-index: 2;
+  background: rgba(13, 17, 23, 0.75);
+  border: 1px solid rgba(88, 166, 255, 0.35);
+  border-radius: 999px;
+  color: var(--accent);
+  font-size: 14px;
+  letter-spacing: 0.15em;
+  padding: 8px 22px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+  animation: fadeIn 0.3s ease;
+  pointer-events: none;
+}
+
 /* ---- 选择分支 ---- */
 .choice-area {
   margin-top: 24px;

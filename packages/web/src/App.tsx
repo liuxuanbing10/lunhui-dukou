@@ -4,6 +4,7 @@ import { residentName } from './residents';
 import { useTypewriter } from './hooks/useTypewriter';
 import { injectThemeVars } from './visual/theme';
 import { createAudioEngine, SILENCE_MS, type AudioEngine } from './audio/audio';
+import { RESIDENTS } from './residents';
 import { Rain } from './components/Rain';
 import { AskingPhase } from './components/AskingPhase';
 import { ChoicePhase } from './components/ChoicePhase';
@@ -41,6 +42,8 @@ export function App() {
   const [silenceActive, setSilenceActive] = useState(false);
   // 当前居民立绘表情（命中关键 → face_hit；未命中保守回应 → face_pressed；其余 body）
   const [portraitVariant, setPortraitVariant] = useState<PortraitVariant>('body');
+  // 跑图近身：场景中距离最近的人物（< 2 单位时提示"按 F 对话"）
+  const [nearResident, setNearResident] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // 音频引擎：惰性创建、用户手势内 start，卸载时 dispose（测试环境无 AudioContext，全部 no-op）
@@ -66,6 +69,17 @@ export function App() {
       audioRef.current = null;
     };
   }, []);
+
+  // F 键：近身时开始对话（跑图交互）
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() === 'f' && nearResident && phase === 'intro') {
+        handleSelectResident(nearResident);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
 
   const typewriter = useTypewriter(dialogText, 35, phase === 'intro');
 
@@ -183,9 +197,16 @@ export function App() {
           npcTexture={portraitSrc(selected, portraitVariant) ?? null}
           selected={selected}
           onSelectResident={handleSelectResident}
+          onNearChange={setNearResident}
         />
       </Suspense>
       <Rain />
+      {/* 跑图近身提示：靠近人物时显示"按 F 对话"（仅审问阶段） */}
+      {phase === 'intro' && nearResident && (
+        <div className="near-hint">
+          {RESIDENTS[nearResident]?.name ?? nearResident} · 按 F 对话
+        </div>
+      )}
       <div className="stage">
         <h1 className="title">轮回渡口</h1>
         <div className="subtitle">LUNHUI DUKOU</div>

@@ -1,11 +1,11 @@
 /**
- * 角色立绘素材表（透明底 PNG，来自 AI 生图 → 抠图管线）
+ * 角色立绘素材表（透明底 WebP，来自 AI 生图 → 抠图管线）
  * 当前只有 r1 蓑衣人（2026-08-11 首版方向稿）；后续角色生成后按同结构追加。
  */
-import r1Body from './assets/portraits/r1/body.png';
-import r1FaceHit from './assets/portraits/r1/face_hit.png';
-import r1FacePressed from './assets/portraits/r1/face_pressed.png';
-import r1FaceRelief from './assets/portraits/r1/face_relief.png';
+import r1Body from './assets/portraits/r1/body.webp';
+import r1FaceHit from './assets/portraits/r1/face_hit.webp';
+import r1FacePressed from './assets/portraits/r1/face_pressed.webp';
+import r1FaceRelief from './assets/portraits/r1/face_relief.webp';
 
 export type PortraitVariant = 'body' | 'face_hit' | 'face_pressed' | 'face_relief';
 
