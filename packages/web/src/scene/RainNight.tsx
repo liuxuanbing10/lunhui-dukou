@@ -86,13 +86,31 @@ function ResidentModel({
   const [primary, accent] = RESIDENT_COLORS[id] ?? ['#4a5b6e', '#b87d8a'];
   const body = RESIDENT_BODY[id] ?? { scale: 1.0, lean: 0.0 };
   const { camera } = useThree();
+  // 肢体动画 refs（程序化骨骼：摆臂/迈步/呼吸）
+  const armLRef = useRef<THREE.Mesh>(null);
+  const armRRef = useRef<THREE.Mesh>(null);
+  const legLRef = useRef<THREE.Mesh>(null);
+  const legRRef = useRef<THREE.Mesh>(null);
+  const headRef = useRef<THREE.Mesh>(null);
 
-  // 呼吸微动（站立起伏）+ 选中时转向玩家
+  // 呼吸微动（站立起伏）+ 选中时转向玩家 + 肢体摆动（程序化骨骼动画）
   useFrame(({ clock }) => {
     const g = groupRef.current;
     if (!g) return;
     const t = clock.getElapsedTime();
     g.position.y = Math.sin(t * 1.8 + (id.charCodeAt(1) % 7)) * 0.015;
+    // 程序化行走循环：摆臂 + 迈步（慢速站立 idle 姿态）
+    const phase = t * 2.6 + (id.charCodeAt(1) % 7) * 1.3;
+    const armSwing = Math.sin(phase) * 0.22;
+    const legSwing = Math.sin(phase) * 0.14;
+    if (armLRef.current) armLRef.current.rotation.x = armSwing;
+    if (armRRef.current) armRRef.current.rotation.x = -armSwing;
+    if (legLRef.current) legLRef.current.rotation.x = legSwing;
+    if (legRRef.current) legRRef.current.rotation.x = -legSwing;
+    // 头部轻微偏转（观察姿态）
+    if (headRef.current) {
+      headRef.current.rotation.y = Math.sin(t * 0.9 + id.charCodeAt(1)) * 0.08;
+    }
     if (selected) {
       // 面向相机（世界坐标 → 本地 yaw）
       const wp = new THREE.Vector3();
@@ -123,8 +141,8 @@ function ResidentModel({
       }}
     >
       <group scale={[s, s, s]}>
-        {/* 头 */}
-        <mesh position={[0, 1.55, 0]} castShadow>
+        {/* 头（带 ref：轻微转头观察） */}
+        <mesh ref={headRef} position={[0, 1.55, 0]} castShadow>
           <sphereGeometry args={[0.17, 14, 12]} />
           <meshStandardMaterial color={selected ? '#6d93b2' : primary} emissive={selected ? '#6d93b2' : primary} emissiveIntensity={0.5} roughness={0.85} />
         </mesh>
@@ -138,24 +156,32 @@ function ResidentModel({
           <boxGeometry args={[0.48, 0.08, 0.3]} />
           <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.35} roughness={0.8} />
         </mesh>
-        {/* 腿 ×2 */}
-        <mesh position={[-0.14, 0.36, 0]} castShadow>
-          <cylinderGeometry args={[0.075, 0.085, 0.72, 8]} />
-          <meshStandardMaterial color={selected ? '#6d93b2' : primary} emissive={selected ? '#6d93b2' : primary} emissiveIntensity={0.5} roughness={0.9} />
-        </mesh>
-        <mesh position={[0.14, 0.36, 0]} castShadow>
-          <cylinderGeometry args={[0.075, 0.085, 0.72, 8]} />
-          <meshStandardMaterial color={selected ? '#6d93b2' : primary} emissive={selected ? '#6d93b2' : primary} emissiveIntensity={0.5} roughness={0.9} />
-        </mesh>
-        {/* 臂 ×2（微摆） */}
-        <mesh position={[-0.31, 1.28, 0]} rotation={[0.06, 0, 0.05]}>
-          <cylinderGeometry args={[0.05, 0.055, 0.5, 6]} />
-          <meshStandardMaterial color={primary} emissive={primary} emissiveIntensity={0.5} roughness={0.9} />
-        </mesh>
-        <mesh position={[0.31, 1.28, 0]} rotation={[0.06, 0, -0.05]}>
-          <cylinderGeometry args={[0.05, 0.055, 0.5, 6]} />
-          <meshStandardMaterial color={primary} emissive={primary} emissiveIntensity={0.5} roughness={0.9} />
-        </mesh>
+        {/* 腿 ×2（pivot 在髋部，绕髋摆动迈步） */}
+        <group position={[-0.14, 0.72, 0]}>
+          <mesh ref={legLRef} position={[0, -0.36, 0]} castShadow>
+            <cylinderGeometry args={[0.075, 0.085, 0.72, 8]} />
+            <meshStandardMaterial color={selected ? '#6d93b2' : primary} emissive={selected ? '#6d93b2' : primary} emissiveIntensity={0.5} roughness={0.9} />
+          </mesh>
+        </group>
+        <group position={[0.14, 0.72, 0]}>
+          <mesh ref={legRRef} position={[0, -0.36, 0]} castShadow>
+            <cylinderGeometry args={[0.075, 0.085, 0.72, 8]} />
+            <meshStandardMaterial color={selected ? '#6d93b2' : primary} emissive={selected ? '#6d93b2' : primary} emissiveIntensity={0.5} roughness={0.9} />
+          </mesh>
+        </group>
+        {/* 臂 ×2（pivot 在肩部，绕肩摆臂） */}
+        <group position={[-0.31, 1.5, 0]}>
+          <mesh ref={armLRef} position={[0, -0.25, 0]} rotation={[0.06, 0, 0.05]}>
+            <cylinderGeometry args={[0.05, 0.055, 0.5, 6]} />
+            <meshStandardMaterial color={primary} emissive={primary} emissiveIntensity={0.5} roughness={0.9} />
+          </mesh>
+        </group>
+        <group position={[0.31, 1.5, 0]}>
+          <mesh ref={armRRef} position={[0, -0.25, 0]} rotation={[0.06, 0, -0.05]}>
+            <cylinderGeometry args={[0.05, 0.055, 0.5, 6]} />
+            <meshStandardMaterial color={primary} emissive={primary} emissiveIntensity={0.5} roughness={0.9} />
+          </mesh>
+        </group>
 
         {/* ---- 标志性配饰（按居民 id） ---- */}
         {id === 'r1' && (
@@ -270,17 +296,34 @@ function DukouModel() {
  * 阶段 1 材质写实化：按对象名给 GLB 程序化 PBR 纹理（对照 R2/R3 参考图）。
  * 白墙斑驳 / 黛瓦瓦楞 / 湿石板 / 湿木；窗灯/灯笼 emissive 保持。
  */
+/** 纹理单例缓存（模块级，避免每次加载 GLB 重新生成 Canvas） */
+let texCache: {
+  wall: THREE.CanvasTexture;
+  roof: THREE.CanvasTexture;
+  stone: THREE.CanvasTexture;
+  wood: THREE.CanvasTexture;
+} | null = null;
+
 function applyVillageTextures(root: THREE.Object3D) {
-  const wallTex = wallTexture();
-  const roofTex = roofTexture();
-  const stoneTex = stoneTexture();
-  const woodTex = woodTexture();
+  if (!texCache) {
+    texCache = {
+      wall: wallTexture(),
+      roof: roofTexture(),
+      stone: stoneTexture(),
+      wood: woodTexture(),
+    };
+  }
+  const { wall: wallTex, roof: roofTex, stone: stoneTex, wood: woodTex } = texCache;
   root.traverse((o) => {
     const mesh = o as THREE.Mesh;
     if (!mesh.isMesh) return;
     // 阶段 2：开阴影投射/接收（汤碗暖光实时阴影）
     mesh.castShadow = true;
     mesh.receiveShadow = true;
+    // 植被不换纹理（保持 Blender 原色，避免纹理覆盖叶子）
+    if (mesh.name.startsWith('veg_') || mesh.name.startsWith('willow') || mesh.name.startsWith('reed') || mesh.name.startsWith('lotus')) {
+      return;
+    }
     const mat = mesh.material as THREE.MeshStandardMaterial;
     if (!mat || !mat.isMeshStandardMaterial) return;
     const n = mesh.name;
@@ -449,7 +492,13 @@ function SplashPoints() {
     const geo = geoRef.current;
     if (!geo) return;
     const t = clock.getElapsedTime();
-    const colors = new Float32Array(SPLASH_COUNT * 3);
+    // 复用颜色 BufferAttribute（避免每帧 new → GC 压力）
+    let colorAttr = geo.getAttribute('color') as THREE.BufferAttribute | null;
+    if (!colorAttr || colorAttr.array.length !== SPLASH_COUNT * 3) {
+      colorAttr = new THREE.BufferAttribute(new Float32Array(SPLASH_COUNT * 3), 3);
+      geo.setAttribute('color', colorAttr);
+    }
+    const colors = colorAttr.array as Float32Array;
     for (let i = 0; i < SPLASH_COUNT; i++) {
       // 每颗粒子按各自相位周期性闪烁
       const v = Math.max(0, Math.sin(t * 3.0 + (phases[i] ?? 0)));
@@ -461,7 +510,7 @@ function SplashPoints() {
       colors[i * 3 + 1] = warm ? bright * 0.8 : bright * 0.7;
       colors[i * 3 + 2] = bright * 0.85;
     }
-    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    colorAttr.needsUpdate = true;
   });
 
   return (
