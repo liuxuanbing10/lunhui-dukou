@@ -15,170 +15,39 @@
  * 颜色全部引用 visual/theme 的 theme token（与 docs/art-style-standard-2.5d.md 对齐），
  * 禁止内联 hex 字面量，确保美术可在 theme.ts 统一微调。
  */
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { EffectComposer, Bloom, Vignette, Noise } from '@react-three/postprocessing';
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { theme } from '../visual/theme';
 
 export type RainMode = 'idle' | 'silence' | 'memory';
 
 /**
- * 渡口小镇环境（全程序化几何，零资产）：
- * 近景栈桥 + 灯柱 → 中景汤碗/渡船 → 远景建筑剪影（钟楼/面馆/花店），雾中层次。
- * 色值全部来自 theme token，禁止内联 hex。
+ * 渡口小镇（Blender 建模 GLB：栈桥/建筑剪影/渡船/灯笼/汤碗台座）。
+ * 异步加载，加载完成前不渲染（避免挂起影响 EffectComposer）。
  */
-function Townscape() {
-  const wood = useMemo(
-    () => new THREE.MeshStandardMaterial({ color: '#2a3a4a', roughness: 0.85, metalness: 0.05 }),
-    [],
-  );
-  const woodLight = useMemo(
-    () => new THREE.MeshStandardMaterial({ color: '#3a4e60', roughness: 0.8, metalness: 0.05 }),
-    [],
-  );
-  const silhouette = useMemo(() => new THREE.MeshBasicMaterial({ color: '#0c1722' }), []);
-  const silhouetteDim = useMemo(() => new THREE.MeshBasicMaterial({ color: '#0a131d' }), []);
-  const rock = useMemo(() => new THREE.MeshStandardMaterial({ color: '#1a2634', roughness: 1 }), []);
-  const lantern = useMemo(
-    () => new THREE.MeshBasicMaterial({ color: theme.warm.glow, toneMapped: false }),
-    [],
-  );
-
-  // 栈桥木板（近景 → 渡口），浮于水面（y≈-0.55）之上
-  const planks = [-3.6, -3.0, -2.4, -1.8, -1.2, -0.6, 0.0, 0.6, 1.2, 1.8, 2.4, 3.0, 3.6, 4.2].map((z) => (
-    <mesh key={`p${z}`} position={[0, 0.06, z]}>
-      <boxGeometry args={[2.6, 0.09, 0.5]} />
-      <primitive object={z < -0.6 ? wood : woodLight} attach="material" />
-    </mesh>
-  ));
-
-  // 栈桥桩
-  const postData: Array<[number, number, number]> = [
-    [-1.2, 0.4, -0.6], [1.2, 0.4, -0.6], [-1.2, 0.4, -2.4], [1.2, 0.4, -2.4],
-  ];
-  const posts = postData.map(([x, y, z], i) => (
-    <mesh key={`po${i}`} position={[x, y, z]}>
-      <boxGeometry args={[0.14, 1.0, 0.14]} />
-      <primitive object={rock} attach="material" />
-    </mesh>
-  ));
-
-  // 灯柱（暖光灯笼）
-  const lampData: Array<[number, number, number]> = [
-    [-1.9, 1.35, 1.2], [2.1, 1.35, 0.4], [-1.9, 1.35, -1.8],
-  ];
-  const lampPosts = lampData.map(([x, y, z], i) => (
-    <group key={`lp${i}`} position={[x, y, z]}>
-      <mesh position={[0, -0.7, 0]}>
-        <cylinderGeometry args={[0.045, 0.06, 1.4, 6]} />
-        <primitive object={silhouette} attach="material" />
-      </mesh>
-      <mesh position={[0, 0.05, 0]}>
-        <sphereGeometry args={[0.16, 8, 8]} />
-        <primitive object={lantern} attach="material" />
-      </mesh>
-    </group>
-  ));
-
-  // 渡船剪影（水面右侧）
-  const ferry = (
-    <group position={[3.1, -0.28, -2.8]}>
-      <mesh position={[0, 0.12, 0]}>
-        <boxGeometry args={[2.1, 0.42, 0.85]} />
-        <primitive object={silhouette} attach="material" />
-      </mesh>
-      <mesh position={[0, 0.5, 0]} rotation={[0, 0, 0.16]}>
-        <cylinderGeometry args={[0.035, 0.035, 0.8, 5]} />
-        <primitive object={silhouette} attach="material" />
-      </mesh>
-      <mesh position={[0, 0.62, 0]} rotation={[0.2, 0, 0]}>
-        <boxGeometry args={[0.9, 0.55, 0.06]} />
-        <primitive object={silhouette} attach="material" />
-      </mesh>
-      {/* 船头小灯 */}
-      <mesh position={[0, 0.95, 0]}>
-        <sphereGeometry args={[0.07, 6, 6]} />
-        <primitive object={lantern} attach="material" />
-      </mesh>
-    </group>
-  );
-
-  // 远景建筑剪影（雾中）
-  const clockTower = (
-    <group position={[-4.4, 0, -7.5]}>
-      <mesh position={[0, 2.4, 0]}>
-        <boxGeometry args={[1.3, 4.8, 1.3]} />
-        <primitive object={silhouetteDim} attach="material" />
-      </mesh>
-      <mesh position={[0, 5.3, 0]}>
-        <coneGeometry args={[0.85, 1.6, 4]} />
-        <primitive object={silhouetteDim} attach="material" />
-      </mesh>
-      {/* 钟面微光 */}
-      <mesh position={[0.65, 3.1, 0]}>
-        <circleGeometry args={[0.22, 8]} />
-        <primitive object={lantern} attach="material" />
-      </mesh>
-    </group>
-  );
-  const noodleShop = (
-    <group position={[3.6, 0, -6.2]}>
-      <mesh position={[0, 1.0, 0]}>
-        <boxGeometry args={[2.4, 2.0, 1.8]} />
-        <primitive object={silhouette} attach="material" />
-      </mesh>
-      <mesh position={[0, 2.15, 0]}>
-        <coneGeometry args={[1.9, 1.2, 4]} />
-        <primitive object={silhouette} attach="material" />
-      </mesh>
-      {/* 窗暖光 */}
-      <mesh position={[0, 1.15, 0.91]}>
-        <planeGeometry args={[0.5, 0.4]} />
-        <primitive object={lantern} attach="material" />
-      </mesh>
-    </group>
-  );
-  const flowerShop = (
-    <group position={[5.0, 0, -4.6]}>
-      <mesh position={[0, 0.75, 0]}>
-        <boxGeometry args={[1.6, 1.5, 1.5]} />
-        <primitive object={silhouetteDim} attach="material" />
-      </mesh>
-      <mesh position={[0, 1.6, 0]}>
-        <coneGeometry args={[1.25, 0.9, 4]} />
-        <primitive object={silhouetteDim} attach="material" />
-      </mesh>
-    </group>
-  );
-
-  // 岸堤岩石（左侧前景）
-  const rockData: Array<[number, number, number, [number, number, number]]> = [
-    [-3.1, 0.1, 1.8, [1.6, 0.7, 1.2]],
-    [-2.7, -0.05, 3.4, [1.1, 0.45, 0.9]],
-    [-3.5, 0.0, -0.4, [1.4, 0.55, 1.0]],
-    [-2.9, -0.15, -2.6, [1.8, 0.5, 1.2]],
-  ];
-  const rocks = rockData.map(([x, y, z, s], i) => (
-    <mesh key={`rk${i}`} position={[x, y, z]}>
-      <boxGeometry args={[s[0], s[1], s[2]]} />
-      <primitive object={rock} attach="material" />
-    </mesh>
-  ));
-
-  return (
-    <group>
-      {planks}
-      {posts}
-      {lampPosts}
-      {ferry}
-      {clockTower}
-      {noodleShop}
-      {flowerShop}
-      {rocks}
-    </group>
-  );
+function DukouModel() {
+  const [scene, setScene] = useState<THREE.Group | null>(null);
+  useEffect(() => {
+    try {
+      const loader = new GLTFLoader();
+      loader.load(
+        '/src/assets/scene/dukou.glb',
+        (gltf) => setScene(gltf.scene),
+        undefined,
+        (e) => console.error('[scene] GLB 加载失败', e),
+      );
+    } catch (e) {
+      // jsdom/测试环境无 URL 解析，静默降级（Canvas 仍渲染）
+      console.error('[scene] GLB 加载跳过', e);
+    }
+  }, []);
+  if (!scene) return null;
+  return <primitive object={scene} />;
 }
+
 
 /**
  * NPC billboard：居民立绘贴进 3D 场景（渡口汤碗旁），始终面向相机。
@@ -423,16 +292,12 @@ function RainScene({ mode, npcTexture }: { mode: RainMode; npcTexture: string | 
   return (
     <>
       <ambientLight ref={ambientLight} intensity={0.12} />
-      {/* 汤碗暖光：自发光小碗 + 暖色点光，经 Bloom 发光（C1 汤碗资产到位后替换 mesh） */}
+      {/* 汤碗暖光：暖色点光（GLB 内含自发光汤碗 mesh，C1 资产到位后替换） */}
       <pointLight ref={pointLight} color={theme.warm.soul} intensity={2.4} distance={14} position={[0, 0.6, 0]} />
-      <mesh position={[0, 0.55, 0]} scale={[1, 0.7, 1]}>
-        <sphereGeometry args={[0.35, 24, 24]} />
-        <meshStandardMaterial
-          color={theme.warm.soul}
-          emissive={theme.warm.soul}
-          emissiveIntensity={2.2}
-          toneMapped={false}
-        />
+      {/* 汤碗 Bloom 焦点 halo（GLB 汤碗自发光之上叠加，保证后期发光焦点） */}
+      <mesh position={[0, 0.68, 0]}>
+        <sphereGeometry args={[0.2, 12, 12]} />
+        <meshBasicMaterial color={theme.warm.soul} toneMapped={false} transparent opacity={0.9} />
       </mesh>
 
       {/* 水面涟漪：噪声 + 正弦扰动着色器（单 draw call，无贴图） */}
@@ -451,8 +316,8 @@ function RainScene({ mode, npcTexture }: { mode: RainMode; npcTexture: string | 
         ))}
       </group>
 
-      {/* 渡口小镇（栈桥/灯柱/渡船/建筑剪影） */}
-      <Townscape />
+      {/* 渡口小镇（Blender GLB：栈桥/灯柱/渡船/建筑剪影） */}
+      <DukouModel />
 
       {/* 雨：instanced 线条（单 draw call） */}
       <instancedMesh
@@ -485,7 +350,7 @@ export function RainNight({
       gl={{ antialias: true, powerPreference: 'high-performance' }}
     >
       <color attach="background" args={[theme.rain.base]} />
-      <fog attach="fog" args={[theme.rain.base, 5.5, 17]} />
+      <fog attach="fog" args={[theme.rain.base, 8, 22]} />
       <RainScene mode={mode} npcTexture={npcTexture} />
       <EffectComposer>
         <Bloom

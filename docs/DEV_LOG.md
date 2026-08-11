@@ -6,6 +6,21 @@
 
 ---
 
+## 2026-08-11 · Blender 3D 渡口小镇建模（替代程序化几何）
+
+**本次内容**：
+1. **Blender 建模**：blender-mcp 驱动 Blender 5.2 建渡口小镇——栈桥（14 木板+4 桩）、岸堤岩石、钟楼（塔身+尖顶+钟面微光）、面馆（窗暖光）、花店、渡船（船体+桅杆+帆+船灯）、3 根灯笼灯柱（自发光）、汤碗台座（自发光）。材质库对齐 theme.ts 色值（wood/silhouette/rock/lantern/soup_glow）。
+2. **导出 GLB**（412KB / 44 对象）：排除水面（前端 shader 渲染）、默认相机/灯光（前端自有）。glTF Y-up 自动转换与前端坐标对齐。
+3. **前端接入**：Townscape 程序化几何 → `DukouModel`（GLTFLoader 异步加载 + ready state，jsdom 下 try-catch 静默降级）；移除前端汤碗 mesh（GLB 自带）；汤碗加 Bloom halo 焦点；雾距 8-22 让远景建筑露出。
+
+**决策**：场景主体用 Blender GLB（低模+材质可控），雨/水面/雾/后期/立绘 billboard 仍由前端程序化。
+
+**坑**：jsdom 测试环境无法解析 `/src/assets/...` URL（FileLoader 抛 Invalid URL）——DukouModel 包 try-catch，测试降级不加载 GLB。
+
+**下一步**：建筑细节/材质打磨（木板纹理、建筑墙面）；跑图（WASD+站位）；立绘 WebP 压缩。
+
+---
+
 ## 2026-08-11 · 场景重建（渡口小镇）+ 审计问题修复落地
 
 **本次内容**：
