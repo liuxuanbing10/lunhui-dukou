@@ -22,6 +22,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { theme } from '../visual/theme';
 import { portraitSrc, type PortraitVariant } from '../portraits';
+import { resolveMove, isWalkable } from './walkable';
 
 export type RainMode = 'idle' | 'silence' | 'memory';
 
@@ -30,14 +31,14 @@ export type RainMode = 'idle' | 'silence' | 'memory';
  * r1 用写实立绘 billboard；其余暂用剪影人形（立绘生产后逐个替换）。
  */
 const RESIDENT_SPOTS: Array<{ id: string; pos: [number, number, number] }> = [
-  { id: 'r1', pos: [0.85, 0, 0.1] }, // 渡口栈桥（立绘）
-  { id: 'r2', pos: [3.5, 0, 2.2] }, // 右岸花店前
-  { id: 'r3', pos: [-5.2, 0, 1.2] }, // 左岸面馆前
-  { id: 'r4', pos: [-4.2, 0, -1.6] }, // 左岸纸扎铺
-  { id: 'r5', pos: [4.6, 0, -0.4] }, // 右岸钟表铺
-  { id: 'r6', pos: [-1.8, 0, 3.0] }, // 乌篷船边
-  { id: 'r7', pos: [-1.6, 0, -6.0] }, // 石拱桥桥头
-  { id: 'r8', pos: [4.0, 0, -3.2] }, // 巷口
+  { id: 'r1', pos: [0, 0, 0.8] }, // 栈桥尽头渡口（面朝河）
+  { id: 'r2', pos: [-7.2, 0, 3.6] }, // 花店门前
+  { id: 'r3', pos: [-3.5, 0, 4.4] }, // 面馆门口檐下
+  { id: 'r4', pos: [2.9, 0, 3.9] }, // 纸扎铺门前
+  { id: 'r5', pos: [-6.5, 0, -4.0] }, // 钟表铺门口
+  { id: 'r6', pos: [7.5, 0, 3.4] }, // 渔屋前晾网架旁
+  { id: 'r7', pos: [-5.5, 0, -2.4] }, // 西桥北桥头（巡逻位）
+  { id: 'r8', pos: [5.5, 0, 2.0] }, // 东桥南桥头（桥下避雨）
 ];
 
 /** 剪影人形（未出立绘的居民占位；点击选中） */
@@ -182,9 +183,9 @@ function NpcBillboard({
 }
 
 // 雨滴数量（单 instancedMesh = 1 draw call；按设备像素比 dpr=[1,2] 自适应）
-const RAIN_COUNT = 500;
+const RAIN_COUNT = 900; // 水乡夜雨，密而不乱
 // silence 段雨势减弱（标准 §4.3：密度随演出状态可调）
-const RAIN_COUNT_SILENCE = 280;
+const RAIN_COUNT_SILENCE = 320;
 
 interface Drop {
   x: number;
@@ -378,13 +379,26 @@ function RainScene({
     const moving = keys.w || keys.a || keys.s || keys.d;
     if (moving) {
       const speed = dt * 4.0;
-      if (keys.w) camera.position.z -= speed;
-      if (keys.s) camera.position.z += speed;
-      if (keys.a) camera.position.x -= speed;
-      if (keys.d) camera.position.x += speed;
-      // 渡口区域边界
-      camera.position.x = Math.max(-4.5, Math.min(4.5, camera.position.x));
-      camera.position.z = Math.max(-8.5, Math.min(3.5, camera.position.z));
+      // 首次进入步行：从俯瞰全景吸附到南沿河街（步行起点）
+      if (!isWalkable(camera.position.x, camera.position.z)) {
+        camera.position.x = 0;
+        camera.position.z = 2.6;
+      }
+      let dx = 0;
+      let dz = 0;
+      if (keys.w) dz -= speed;
+      if (keys.s) dz += speed;
+      if (keys.a) dx -= speed;
+      if (keys.d) dx += speed;
+      // 可行走区域约束（禁止穿建筑/水面，贴边滑动）
+      const next = resolveMove(
+        { x: camera.position.x, z: camera.position.z },
+        dx,
+        dz,
+      );
+      camera.position.x = next.x;
+      camera.position.z = next.z;
+      camera.position.y = 1.9; // 步行高度（沿河街/广场/桥面）
       camera.lookAt(camera.position.x, 0.9, camera.position.z - 8);
       walkPosRef.current = { x: camera.position.x, z: camera.position.z };
     } else if (mode !== 'silence' && focus) {
@@ -402,13 +416,14 @@ function RainScene({
         // 保持行走位置（不回跳全景）
         camera.lookAt(camera.position.x, 0.9, camera.position.z - 8);
       } else {
-        const targetX = mode === 'silence' ? 0 : Math.sin(t * 0.3) * 0.7;
-        const targetZ = mode === 'silence' ? 4.6 : 8.2 + Math.sin(t * 0.22) * 0.5;
-        const targetY = mode === 'silence' ? 1.45 : 1.9;
+        // 俯瞰全景（初始）：从高处看向小镇
+        const targetX = mode === 'silence' ? 0 : Math.sin(t * 0.2) * 0.5;
+        const targetZ = mode === 'silence' ? 4.6 : 9.5 + Math.sin(t * 0.15) * 0.4;
+        const targetY = mode === 'silence' ? 1.45 : 3.2;
         camera.position.x += (targetX - camera.position.x) * k;
         camera.position.y += (targetY - camera.position.y) * k;
         camera.position.z += (targetZ - camera.position.z) * k;
-        camera.lookAt(0, 0.9, -0.6);
+        camera.lookAt(0, 0.4, 0);
       }
     }
 
@@ -576,7 +591,7 @@ export function RainNight({
       style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'auto' }}
       onPointerMissed={() => setFocus(null)}
       dpr={[1, 2]}
-      camera={{ position: [0, 1.9, 8.5], fov: 50 }}
+      camera={{ position: [0, 3.2, 9.5], fov: 55 }}
       gl={{ antialias: true, powerPreference: 'high-performance' }}
     >
       <color attach="background" args={[theme.rain.base]} />
