@@ -15,7 +15,7 @@
  * 颜色全部引用 visual/theme 的 theme token（与 docs/art-style-standard-2.5d.md 对齐），
  * 禁止内联 hex 字面量，确保美术可在 theme.ts 统一微调。
  */
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { EffectComposer, Bloom, Vignette, Noise } from '@react-three/postprocessing';
 import * as THREE from 'three';
@@ -23,6 +23,43 @@ import { theme } from '../visual/theme';
 import { SILENCE_MS } from '../audio/audio';
 
 export type RainMode = 'idle' | 'silence' | 'memory';
+
+/**
+ * NPC billboard：居民立绘贴进 3D 场景（渡口汤碗旁），始终面向相机。
+ * 切换贴图（换人/换表情）时通过 key 强制重挂载 → opacity 从 0 淡入。
+ */
+function NpcBillboard({ textureUrl }: { textureUrl: string }) {
+  const [ready, setReady] = useState(false);
+  const texture = useMemo(() => {
+    const t = new THREE.TextureLoader().load(textureUrl, () => setReady(true));
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  }, [textureUrl]);
+  const meshRef = useRef<THREE.Mesh>(null);
+
+  // billboard：每帧对齐相机朝向（纹理加载完成前不挂 mesh，避免挂起影响 EffectComposer）
+  useFrame(({ camera }) => {
+    if (meshRef.current) {
+      meshRef.current.quaternion.copy(camera.quaternion);
+    }
+  });
+
+  if (!ready) return null;
+  return (
+    <mesh ref={meshRef} position={[0.9, 2.0, 1.4]}>
+      <planeGeometry args={[1.9, 5.2]} />
+      <meshBasicMaterial
+        map={texture}
+        alphaMap={texture}
+        transparent
+        alphaTest={0.3}
+        depthWrite={false}
+        side={THREE.DoubleSide}
+        toneMapped={false}
+      />
+    </mesh>
+  );
+}
 
 // 雨滴数量（单 instancedMesh = 1 draw call；按设备像素比 dpr=[1,2] 自适应）
 const RAIN_COUNT = 500;
@@ -107,7 +144,7 @@ const GHOSTS = [
   { pos: [0.2, -0.4, -0.6], size: [2.0, 2.2], color: theme.memory.ghost, phase: 4.2 },
 ] as const;
 
-function RainScene({ mode }: { mode: RainMode }) {
+function RainScene({ mode, npcTexture }: { mode: RainMode; npcTexture: string | null }) {
   const rainRef = useRef<THREE.InstancedMesh>(null);
   const rainMat = useRef<THREE.MeshBasicMaterial>(null);
   const pointLight = useRef<THREE.PointLight>(null);
@@ -266,11 +303,20 @@ function RainScene({ mode }: { mode: RainMode }) {
         <boxGeometry args={[1, 1, 1]} />
         <meshBasicMaterial ref={rainMat} color={theme.rain.drop} transparent opacity={0.5} depthWrite={false} />
       </instancedMesh>
+
+      {/* 居民立绘（billboard）：站在渡口汤碗旁，始终面向玩家 */}
+      {npcTexture && <NpcBillboard key={npcTexture} textureUrl={npcTexture} />}
     </>
   );
 }
 
-export function RainNight({ mode = 'idle' }: { mode?: RainMode }) {
+export function RainNight({
+  mode = 'idle',
+  npcTexture = null,
+}: {
+  mode?: RainMode;
+  npcTexture?: string | null;
+}) {
   return (
     <Canvas
       // 固定全屏、置于相位 UI 之下（UI z-index:1），不拦截指针事件
@@ -281,7 +327,7 @@ export function RainNight({ mode = 'idle' }: { mode?: RainMode }) {
     >
       <color attach="background" args={[theme.rain.base]} />
       <fog attach="fog" args={[theme.rain.base, 7, 20]} />
-      <RainScene mode={mode} />
+      <RainScene mode={mode} npcTexture={npcTexture} />
       <EffectComposer>
         <Bloom
           intensity={mode === 'silence' ? 0.6 : 1.0}

@@ -6,6 +6,28 @@
 
 ---
 
+## 2026-08-11 · 视觉风格定稿：写实电影感 + 立绘提示词投喂包 + 3D 跑图方向
+
+**本次内容**：
+1. **风格大方向拍板**：r1 蓑衣人首版立绘（5 面板合成图）出图后，主理人当场定夺——**写实电影感数字绘画**为全资产风格锁，替代原「厚涂水彩」定位。血渍细节保留（与"捞过玩家 7 次"设定暗合），渐变底抠图时处理。
+2. **40 条立绘提示词落盘**：`docs/prompts/character-art/`（8 角色 × 5 层：body / face_hit / face_pressed / face_relief / light），逐字保留原 AI_IMAGE_PROMPTS.md B 节内容，脚本校验 40/40 一致。
+3. **风格锁全量改写实**：character-art 8 文件 + AI_IMAGE_PROMPTS.md 全部 80 处 prompt（含 A/C/D/E 节场景/道具/记忆/海报）统一替换为 `cinematic photorealistic` 锁，`thick-paint / painterly / NOT photorealistic` 清零。
+4. **宪法同步修订**：art-style-standard-2.5d.md §1.1、ART_MASTER_PLAN.md §1.1 风格锚 + §2.2 风格锁措辞。
+5. **3D 跑图方向确认**（对话中）：浏览器跑 MC 级 3D 无压力 → 修正为"程序化 3D 小镇 + billboard 2D 立绘"路线，2.5D 宪法 §1.3 排除条款待跑图实施时再修订（本次未动）。
+
+**决策**：
+- 风格锁 = `cinematic photorealistic digital painting, film concept art, rain-night muted blue palette, single warm soup-bowl light, heavy vignette, film grain, not anime cel-shading, not cartoon, no flat illustration`；
+- 全资产统一写实（立绘/场景/道具/记忆/海报），不回头；
+- r1 蓑衣人 = 方向基准图，后续 7 角色全按此风格生成。
+
+**坑**：
+- read_file 相对路径偶发解析失败（docs/ 下部分文件需绝对路径）；
+- 反引号在 bash 命令内触发命令替换，复杂 grep 被安全拦截——批量替换改用 Python 脚本处理。
+
+**下一步**：r2 阿岚定妆图（或按 r1 流程继续全阵容）；3D 跑图骨架实施计划落盘。
+
+---
+
 ## 2026-08-02 · 部署调研与服务器规划
 
 **本次内容**：讨论云服务器部署方案。

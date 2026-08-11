@@ -10,6 +10,7 @@ import { AskingPhase } from './components/AskingPhase';
 import { ChoicePhase } from './components/ChoicePhase';
 import { DeathPhase } from './components/DeathPhase';
 import { MemoryPhase } from './components/MemoryPhase';
+import { portraitSrc, type PortraitVariant } from './portraits';
 import './styles.css';
 
 // 视觉主题由 visual/theme 接管（App 注入 CSS 变量，RainNight 改用 theme token）；
@@ -38,6 +39,8 @@ export function App() {
   const [busy, setBusy] = useState(false);
   // 「沉默三秒」留白态：命中关键事实时触发，驱动 RainNight 进入 silence 收束
   const [silenceActive, setSilenceActive] = useState(false);
+  // 当前居民立绘表情（命中关键 → face_hit；未命中保守回应 → face_pressed；其余 body）
+  const [portraitVariant, setPortraitVariant] = useState<PortraitVariant>('body');
   const inputRef = useRef<HTMLInputElement>(null);
 
   // 音频引擎：惰性创建、用户手势内 start，卸载时 dispose（测试环境无 AudioContext，全部 no-op）
@@ -95,6 +98,10 @@ export function App() {
       setDialogText(res.answer);
       setQuestionsLeft(res.questionsLeft);
       setQuestion('');
+      // 立绘表情联动：命中真相 → face_hit；沉默拒绝 → face_pressed；正常对话 → body
+      setPortraitVariant(
+        res.hitFactId ? 'face_hit' : res.answerMode === 'silence' ? 'face_pressed' : 'body',
+      );
       // 命中关键 → 进入「沉默三秒」留白（RainNight silence 收束 + 音频渐弱 + 钟鸣泛音），再落到选择分支
       if (res.hitFactId && res.pause) {
         setSilenceActive(true);
@@ -167,7 +174,7 @@ export function App() {
   return (
     <>
       <Suspense fallback={null}>
-        <RainNight mode={rainMode} />
+        <RainNight mode={rainMode} npcTexture={portraitSrc(selected, portraitVariant) ?? null} />
       </Suspense>
       <Rain />
       <div className="stage">
@@ -189,7 +196,10 @@ export function App() {
               questionsLeft={questionsLeft}
               busy={busy}
               inputRef={inputRef}
-              onSelect={setSelected}
+              onSelect={(id) => {
+                setSelected(id);
+                setPortraitVariant('body');
+              }}
               onQuestionChange={setQuestion}
               onAsk={handleAsk}
             />

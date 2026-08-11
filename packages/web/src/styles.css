@@ -77,7 +77,7 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   padding: 24px;
 }
 
@@ -98,16 +98,18 @@ body {
   margin-bottom: 40px;
 }
 
-/* ---- 对话窗 ---- */
+/* ---- 对话窗（字幕式：下沉透明，露出场景中站立的 NPC） ---- */
 .dialog {
-  width: min(640px, 92vw);
-  min-height: 180px;
-  background: rgba(13, 17, 23, 0.85);
-  border: 1px solid rgba(88, 166, 255, 0.2);
+  width: min(560px, 88vw);
+  min-height: 150px;
+  margin-top: auto;
+  margin-bottom: 5vh;
+  background: rgba(13, 17, 23, 0.62);
+  border: 1px solid rgba(88, 166, 255, 0.18);
   border-radius: 8px;
-  padding: 20px 24px;
-  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(4px);
+  padding: 18px 22px;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(3px);
 }
 
 .dialog-speaker {
@@ -351,3 +353,5 @@ body {
 .memory-continue:hover {
   background: rgba(88, 166, 255, 0.35);
 }
+
+/* ---- 居民立绘（已移入 3D 场景 billboard，本浮窗样式保留作占位兼容） ---- */

@@ -25,12 +25,13 @@
 
 ### 1.1 风格定位（一句话）
 
-> **雨夜水墨厚涂 × 单光源戏剧**：冷蓝压暗的渡口雨夜为底，汤碗暖光为唯一叙事光源，
+> **雨夜写实电影 × 单光源戏剧**：冷蓝压暗的渡口雨夜为底，汤碗暖光为唯一叙事光源，
 > 用立绘微表情与沉默留白演戏——不炫技、不堆料，每一笔都服务于"审判与释然"的情绪曲线。
+> （2026-08-11 主理人拍板：风格由「水墨厚涂」改为「写实电影感数字绘画」，以 r1 蓑衣人首版为方向基准。）
 
 三个不可动摇的风格锚（偏离即回炉）：
 1. **冷蓝基底 + 唯一暖光源**——全场景只有汤碗一处暖光（记忆碎片微光除外）；
-2. **厚涂/水彩质感，不写实、不二次元贴图感**——AI 风格锁的核心措辞；
+2. **写实电影感数字绘画，不二次元、不卡通**——AI 风格锁的核心措辞；
 3. **留白优先**——信息密度低于市面同类，暗角与雾是构图工具，不是遮丑布。
 
 ### 1.2 标杆矩阵（借鉴什么 / 不学什么 / 我们的落点）
@@ -116,7 +117,7 @@
 
 1. **调色板锚定**：所有 prompt 必须引用 `theme.ts` 实际值（`rain.base #0b1a2b` / `warm.soul #ffb15c` / `memory.amber #d8a24a`），禁止凭感觉写颜色词；
 2. **风格锁措辞**（写入每个 prompt 尾部）：
-   `2.5D illustration, thick-paint watercolor texture, rain-night muted blue palette, single warm soup-bowl light, heavy vignette, painterly, not photorealistic, not anime cel-shading, no 3D render`；
+   `cinematic photorealistic digital painting, film concept art, rain-night muted blue palette, single warm soup-bowl light, heavy vignette, film grain, not anime cel-shading, not cartoon, no flat illustration`；
 3. **角色色签**：每居民绑定 1 主色 + 1 辅色（剪影可辨），写入 SOUL.md 并注入该角色全部 prompt；
 4. **版本纪律**：`{类型}_{对象}_{变体}_v{N}.webp`，只递增不覆盖，废稿进 `refs/` 留档。
 
