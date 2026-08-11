@@ -10,7 +10,7 @@ import { AskingPhase } from './components/AskingPhase';
 import { ChoicePhase } from './components/ChoicePhase';
 import { DeathPhase } from './components/DeathPhase';
 import { MemoryPhase } from './components/MemoryPhase';
-import { portraitSrc, type PortraitVariant } from './portraits';
+import type { PortraitVariant } from './portraits';
 import { DEATH_LINES } from '@lunhui/engine/death-lines';
 import './styles.css';
 
@@ -194,7 +194,7 @@ export function App() {
       <Suspense fallback={null}>
         <RainNight
           mode={rainMode}
-          npcTexture={portraitSrc(selected, portraitVariant) ?? null}
+          portraitVariant={portraitVariant}
           selected={selected}
           onSelectResident={handleSelectResident}
           onNearChange={setNearResident}

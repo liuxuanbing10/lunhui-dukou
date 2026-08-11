@@ -6,6 +6,22 @@
 
 ---
 
+## 2026-08-11 · Qwen-image 3.0 全角色立绘生产 + 多角色渲染管线
+
+**本次内容**：
+1. **Qwen-image 3.0 生成立绘**（chat.qwen.ai，GitHub OAuth 静默登录）：r2-r8 七位居民 body 立绘全部生成并逐张 vision 过审。管线：聊天输入 prompt（强化"MUST vertical 9:16 full-body"）→ 下载原图 → 裁中央 9:16 → u2net 抠图 → WebP（44-63KB/张）→ 入库。
+2. **踩坑**：Qwen 默认横版（1664×928）+ 常出半身像——修正指令"Redo the same character but extend to FULL-BODY"触发 image_edit 扩展成全身（r2/r5/r6 需重做，r4/r7/r8 一次过）；背景色≈服装色（r2 雾蓝围裙）时颜色抠图失效，u2net 人像识别可靠（30-47% 覆盖率）。
+3. **多角色渲染管线**：NpcBillboard 支持任意位置 + 表情变体；RainScene 遍历 RESIDENT_SPOTS——有立绘用 billboard（selected 显示表情层，他人 body），无立绘回退剪影；删除 npcTexture prop 链（portraitSrc 内部处理），App 改传 portraitVariant。
+4. 清理 App 死 import（portraitSrc）。
+
+**资产现状**：r1 四层齐；r2-r8 body 层齐（表情层/light 层待产）。
+
+**验证**：四件套全绿（69 用例）；浏览器实测 r2 阿岚立绘在场景栈桥右侧可见。
+
+**下一步**：r2-r8 表情层（face_hit/pressed/relief，带 body 参考图）；light 层；.tmp-qwen 原始高清留档或清理。
+
+---
+
 ## 2026-08-11 · 交互形态重构：点击场景人物（按钮退场）
 
 **本次内容**（用户拍板"不要面板交互，要跟真实人物模型交互"）：

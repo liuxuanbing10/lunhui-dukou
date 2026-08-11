@@ -21,6 +21,7 @@ import { EffectComposer, Bloom, Vignette, Noise } from '@react-three/postprocess
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { theme } from '../visual/theme';
+import { portraitSrc, type PortraitVariant } from '../portraits';
 
 export type RainMode = 'idle' | 'silence' | 'memory';
 
@@ -119,10 +120,12 @@ function DukouModel() {
  */
 function NpcBillboard({
   textureUrl,
+  pos,
   selected,
   onSelect,
 }: {
   textureUrl: string;
+  pos: [number, number, number];
   selected: boolean;
   onSelect: () => void;
 }) {
@@ -145,7 +148,7 @@ function NpcBillboard({
   return (
     <mesh
       ref={meshRef}
-      position={[0.85, 1.72, 0.1]}
+      position={[pos[0], pos[1], pos[2]]}
       onClick={(e) => {
         e.stopPropagation();
         onSelect();
@@ -263,7 +266,7 @@ const GHOSTS = [
 
 function RainScene({
   mode,
-  npcTexture,
+  portraitVariant,
   selected,
   onSelectResident,
   focus,
@@ -271,7 +274,7 @@ function RainScene({
   onNearChange,
 }: {
   mode: RainMode;
-  npcTexture: string | null;
+  portraitVariant: PortraitVariant;
   selected: string;
   onSelectResident: (id: string) => void;
   focus: { x: number; z: number } | null;
@@ -518,43 +521,49 @@ function RainScene({
       </instancedMesh>
 
       {/* 居民立绘（billboard）：站在渡口汤碗旁，始终面向玩家 */}
-      {/* 场景居民：r1 写实立绘 + 其余剪影，点击选中（替代按钮选择） */}
-      {RESIDENT_SPOTS.filter((s) => s.id !== 'r1').map((s) => (
-        <ResidentSilhouette
-          key={s.id}
-          id={s.id}
-          pos={s.pos}
-          selected={selected === s.id}
-          onSelect={(id) => {
-            onSelectResident(id);
-            onFocusChange({ x: s.pos[0], z: s.pos[2] });
-          }}
-        />
-      ))}
-      {npcTexture && (
-        <NpcBillboard
-          key={npcTexture}
-          textureUrl={npcTexture}
-          selected={selected === 'r1'}
-          onSelect={() => {
-            onSelectResident('r1');
-            onFocusChange({ x: 0.85, z: 0.1 });
-          }}
-        />
-      )}
+      {/* 场景居民：有立绘的用 billboard（selected 用表情变体），其余剪影；点击选中 */}
+      {RESIDENT_SPOTS.map((s) => {
+        const tex = portraitSrc(s.id, s.id === selected ? portraitVariant : 'body');
+        if (tex) {
+          return (
+            <NpcBillboard
+              key={s.id === selected ? `${s.id}-${portraitVariant}` : s.id}
+              textureUrl={tex}
+              pos={[s.pos[0], 1.72, s.pos[2]]}
+              selected={selected === s.id}
+              onSelect={() => {
+                onSelectResident(s.id);
+                onFocusChange({ x: s.pos[0], z: s.pos[2] });
+              }}
+            />
+          );
+        }
+        return (
+          <ResidentSilhouette
+            key={s.id}
+            id={s.id}
+            pos={s.pos}
+            selected={selected === s.id}
+            onSelect={(id) => {
+              onSelectResident(id);
+              onFocusChange({ x: s.pos[0], z: s.pos[2] });
+            }}
+          />
+        );
+      })}
     </>
   );
 }
 
 export function RainNight({
   mode,
-  npcTexture = null,
+  portraitVariant = 'body',
   selected = 'r1',
   onSelectResident,
   onNearChange,
 }: {
   mode: RainMode;
-  npcTexture?: string | null;
+  portraitVariant?: PortraitVariant;
   selected?: string;
   onSelectResident?: (id: string) => void;
   onNearChange?: (id: string | null) => void;
@@ -574,7 +583,7 @@ export function RainNight({
       <fog attach="fog" args={[theme.rain.base, 8, 22]} />
       <RainScene
         mode={mode}
-        npcTexture={npcTexture}
+        portraitVariant={portraitVariant}
         selected={selected}
         onSelectResident={onSelectResident ?? (() => {})}
         focus={focus}
