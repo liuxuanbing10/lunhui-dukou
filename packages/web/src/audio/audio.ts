@@ -44,6 +44,15 @@ const WARM_FREQ_A = 65; // 低频正弦（sub）
 const WARM_FREQ_B = 98; // 三角波（暖色泛音，约纯五度）
 const WARM_SILENCE = 0.03; // 沉默段稍压暗但保留
 
+// 远处笛音（水乡阴森悬疑·若有若无）：周期性触发的单音，带颤音 + 慢包络
+const FLUTE_BASE = 0.05; // 笛音峰值增益（极轻，似远似近）
+const FLUTE_NOTES = [392, 440, 349.23, 329.63, 293.66]; // G4 A4 F4 E4 D4（五声音阶偏冷）
+const FLUTE_MIN_GAP = 9000; // 两次笛音最小间隔 ms
+const FLUTE_MAX_GAP = 22000; // 最大间隔 ms（不确定性 = 悬疑感）
+const FLUTE_DUR = 3.2; // 单音时长 s（长音渐起渐落）
+const FLUTE_VIB_RATE = 5.2; // 颤音速率 Hz
+const FLUTE_VIB_DEPTH = 4.5; // 颤音深度（音分）
+
 // 沉默过渡时间系数：音频收敛时长 = silenceMs × 该系数（2600×0.16≈416ms），
 // 确保落进视觉 T1(0–500ms) 暖光收束窗口内同帧（对齐 art-style §5.1）。
 const SILENCE_TC_FACTOR = 0.16;
@@ -124,6 +133,9 @@ class WebAudioEngine implements AudioEngine {
 
   private warmGain: GainNode | null = null;
   private warmOscs: OscillatorNode[] = [];
+
+  // 远处笛音：随机间隔触发的长音（似远似近，制造悬疑感）
+  private fluteTimer: ReturnType<typeof setTimeout> | null = null;
 
   private muted = false;
   private silenceTransitionMs = SILENCE_MS * SILENCE_TC_FACTOR;
@@ -257,6 +269,11 @@ class WebAudioEngine implements AudioEngine {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    // 清理笛音调度定时器
+    if (this.fluteTimer) {
+      clearTimeout(this.fluteTimer);
+      this.fluteTimer = null;
+    }
     try {
       if (this.ctx) {
         const t = this.ctx.currentTime;
@@ -343,6 +360,68 @@ class WebAudioEngine implements AudioEngine {
     warmA.start();
     warmB.start();
     this.warmOscs = [warmA, warmB];
+
+    // 远处笛音：启动随机间隔调度（首次稍延迟，避免开场即响）
+    this.scheduleFlute(4000 + Math.random() * 4000);
+  }
+
+  /** 调度下一次笛音（随机间隔 → 不确定性 = 悬疑感）。 */
+  private scheduleFlute(delayMs: number): void {
+    if (this.disposed) return;
+    this.fluteTimer = setTimeout(() => {
+      this.playFluteNote();
+      const next = FLUTE_MIN_GAP + Math.random() * (FLUTE_MAX_GAP - FLUTE_MIN_GAP);
+      this.scheduleFlute(next);
+    }, delayMs);
+  }
+
+  /** 奏一个笛音：正弦 + 轻颤音 + 慢起慢落包络 + 低通（远处感）。 */
+  private playFluteNote(): void {
+    if (!this.ctx || this.disposed || !this.master || this.muted) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    const freq = FLUTE_NOTES[Math.floor(Math.random() * FLUTE_NOTES.length)] ?? 392;
+
+    const o = ctx.createOscillator();
+    o.type = 'sine';
+    o.frequency.value = freq;
+
+    // 颤音（vibrato）：LFO 调制频率
+    const vib = ctx.createOscillator();
+    vib.type = 'sine';
+    vib.frequency.value = FLUTE_VIB_RATE;
+    const vibDepth = ctx.createGain();
+    vibDepth.gain.value = FLUTE_VIB_DEPTH;
+    vib.connect(vibDepth);
+    vibDepth.connect(o.frequency);
+
+    // 低通：削高频 → 似从远处传来
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 1400;
+
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, t);
+    // 慢起 -> 持 -> 慢落
+    g.gain.linearRampToValueAtTime(FLUTE_BASE, t + FLUTE_DUR * 0.3);
+    g.gain.setValueAtTime(FLUTE_BASE, t + FLUTE_DUR * 0.6);
+    g.gain.linearRampToValueAtTime(0, t + FLUTE_DUR);
+
+    o.connect(lp);
+    lp.connect(g);
+    g.connect(this.master);
+
+    o.start(t);
+    vib.start(t);
+    o.stop(t + FLUTE_DUR + 0.05);
+    vib.stop(t + FLUTE_DUR + 0.05);
+    o.onended = () => {
+      safeDisconnect(g);
+      safeDisconnect(lp);
+      safeDisconnect(vibDepth);
+      safeDisconnect(vib);
+      safeDisconnect(o);
+    };
   }
 }
 

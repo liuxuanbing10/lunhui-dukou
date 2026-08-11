@@ -28,17 +28,17 @@ export type RainMode = 'idle' | 'silence' | 'memory';
 
 /**
  * 场景居民站位（世界坐标，对应 Blender GLB 渡口布局）。
- * r1 用写实立绘 billboard；其余暂用剪影人形（立绘生产后逐个替换）。
+ * 全部落在 walkable 河街/桥面/栈桥上，站在建筑正前方（不嵌墙、不穿模）。
  */
 const RESIDENT_SPOTS: Array<{ id: string; pos: [number, number, number] }> = [
   { id: 'r1', pos: [0, 0, 0.8] }, // 栈桥尽头渡口（面朝河）
-  { id: 'r2', pos: [-7.2, 0, 3.6] }, // 花店门前
-  { id: 'r3', pos: [-3.5, 0, 4.4] }, // 面馆门口檐下
-  { id: 'r4', pos: [2.9, 0, 3.9] }, // 纸扎铺门前
-  { id: 'r5', pos: [-6.5, 0, -4.0] }, // 钟表铺门口
-  { id: 'r6', pos: [7.5, 0, 3.4] }, // 渔屋前晾网架旁
-  { id: 'r7', pos: [-5.5, 0, -2.4] }, // 西桥北桥头（巡逻位）
-  { id: 'r8', pos: [5.5, 0, 2.0] }, // 东桥南桥头（桥下避雨）
+  { id: 'r2', pos: [-7.2, 0, 2.5] }, // 花店门前（南河街）
+  { id: 'r3', pos: [-3.5, 0, 2.5] }, // 面馆门前（南河街）
+  { id: 'r4', pos: [2.9, 0, 2.5] }, // 纸扎铺门前（南河街）
+  { id: 'r5', pos: [-6.5, 0, -2.5] }, // 钟表铺门前（北河街）
+  { id: 'r6', pos: [7.5, 0, 2.5] }, // 渔屋前晾网架旁（南河街）
+  { id: 'r7', pos: [-5.5, 0, -2.0] }, // 西桥北桥头（巡逻位，北河街）
+  { id: 'r8', pos: [5.5, 0, 2.0] }, // 东桥南桥头（桥下避雨，南河街）
 ];
 
 /**
@@ -56,8 +56,22 @@ const RESIDENT_COLORS: Record<string, [string, string]> = {
 };
 
 /**
+ * 居民体型参数（身高缩放 + 肩宽）：区分老鲞壮、小满矮、何叔驼背等。
+ */
+const RESIDENT_BODY: Record<string, { scale: number; lean: number }> = {
+  r1: { scale: 1.0, lean: 0.0 },   // 蓑衣人 标准
+  r2: { scale: 0.96, lean: 0.0 },  // 阿岚 略瘦
+  r3: { scale: 1.05, lean: 0.0 },  // 老王 壮实
+  r4: { scale: 0.9, lean: 0.08 },  // 阿黎 瘦弱微驼
+  r5: { scale: 0.92, lean: 0.22 }, // 何叔 驼背
+  r6: { scale: 1.12, lean: 0.0 },  // 老鲞 高大壮硕
+  r7: { scale: 1.0, lean: 0.05 },  // 郑爷 挺直微前倾
+  r8: { scale: 0.62, lean: 0.0 },  // 小满 孩童矮小
+};
+
+/**
  * 3D 居民模型（程序化人形：头/身/四肢，角色色签，受汤碗暖光）。
- * 替代剪影占位——立体、受光、可微动；点击选中。
+ * 每居民带标志性配饰（斗笠/围裙/哨子/布包等）+ 体型区分 + 选中时面向玩家。
  */
 function ResidentModel({
   id,
@@ -70,19 +84,33 @@ function ResidentModel({
 }) {
   const groupRef = useRef<THREE.Group>(null);
   const [primary, accent] = RESIDENT_COLORS[id] ?? ['#4a5b6e', '#b87d8a'];
+  const body = RESIDENT_BODY[id] ?? { scale: 1.0, lean: 0.0 };
+  const { camera } = useThree();
 
-  // 呼吸微动（站立起伏）
+  // 呼吸微动（站立起伏）+ 选中时转向玩家
   useFrame(({ clock }) => {
     const g = groupRef.current;
     if (!g) return;
     const t = clock.getElapsedTime();
     g.position.y = Math.sin(t * 1.8 + (id.charCodeAt(1) % 7)) * 0.015;
+    if (selected) {
+      // 面向相机（世界坐标 → 本地 yaw）
+      const wp = new THREE.Vector3();
+      g.getWorldPosition(wp);
+      const dx = camera.position.x - wp.x;
+      const dz = camera.position.z - wp.z;
+      const targetYaw = Math.atan2(dx, dz);
+      g.rotation.y += (targetYaw - g.rotation.y) * 0.12;
+    }
   });
+
+  const s = body.scale;
 
   return (
     <group
       ref={groupRef}
       position={[0, 0, 0]}
+      rotation={[body.lean, 0, 0]}
       onClick={(e) => {
         e.stopPropagation();
         onSelect();
@@ -94,39 +122,106 @@ function ResidentModel({
         document.body.style.cursor = 'auto';
       }}
     >
-      {/* 头 */}
-      <mesh position={[0, 1.55, 0]} castShadow>
-        <sphereGeometry args={[0.17, 14, 12]} />
-        <meshStandardMaterial color={selected ? '#6d93b2' : primary} emissive={selected ? '#6d93b2' : primary} emissiveIntensity={0.5} roughness={0.85} />
-      </mesh>
-      {/* 身体 */}
-      <mesh position={[0, 1.06, 0]} castShadow>
-        <boxGeometry args={[0.46, 0.58, 0.28]} />
-        <meshStandardMaterial color={primary} emissive={primary} emissiveIntensity={0.5} roughness={0.9} />
-      </mesh>
-      {/* 腰带（色签 accent） */}
-      <mesh position={[0, 0.8, 0]} castShadow>
-        <boxGeometry args={[0.48, 0.08, 0.3]} />
-        <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.35} roughness={0.8} />
-      </mesh>
-      {/* 腿 ×2 */}
-      <mesh position={[-0.14, 0.36, 0]} castShadow>
-        <cylinderGeometry args={[0.075, 0.085, 0.72, 8]} />
-        <meshStandardMaterial color={selected ? '#6d93b2' : primary} emissive={selected ? '#6d93b2' : primary} emissiveIntensity={0.5} roughness={0.9} />
-      </mesh>
-      <mesh position={[0.14, 0.36, 0]} castShadow>
-        <cylinderGeometry args={[0.075, 0.085, 0.72, 8]} />
-        <meshStandardMaterial color={selected ? '#6d93b2' : primary} emissive={selected ? '#6d93b2' : primary} emissiveIntensity={0.5} roughness={0.9} />
-      </mesh>
-      {/* 臂 ×2（微摆） */}
-      <mesh position={[-0.31, 1.28, 0]} rotation={[0.06, 0, 0.05]}>
-        <cylinderGeometry args={[0.05, 0.055, 0.5, 6]} />
-        <meshStandardMaterial color={primary} emissive={primary} emissiveIntensity={0.5} roughness={0.9} />
-      </mesh>
-      <mesh position={[0.31, 1.28, 0]} rotation={[0.06, 0, -0.05]}>
-        <cylinderGeometry args={[0.05, 0.055, 0.5, 6]} />
-        <meshStandardMaterial color={primary} emissive={primary} emissiveIntensity={0.5} roughness={0.9} />
-      </mesh>
+      <group scale={[s, s, s]}>
+        {/* 头 */}
+        <mesh position={[0, 1.55, 0]} castShadow>
+          <sphereGeometry args={[0.17, 14, 12]} />
+          <meshStandardMaterial color={selected ? '#6d93b2' : primary} emissive={selected ? '#6d93b2' : primary} emissiveIntensity={0.5} roughness={0.85} />
+        </mesh>
+        {/* 身体 */}
+        <mesh position={[0, 1.06, 0]} castShadow>
+          <boxGeometry args={[0.46, 0.58, 0.28]} />
+          <meshStandardMaterial color={primary} emissive={primary} emissiveIntensity={0.5} roughness={0.9} />
+        </mesh>
+        {/* 腰带（色签 accent） */}
+        <mesh position={[0, 0.8, 0]} castShadow>
+          <boxGeometry args={[0.48, 0.08, 0.3]} />
+          <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.35} roughness={0.8} />
+        </mesh>
+        {/* 腿 ×2 */}
+        <mesh position={[-0.14, 0.36, 0]} castShadow>
+          <cylinderGeometry args={[0.075, 0.085, 0.72, 8]} />
+          <meshStandardMaterial color={selected ? '#6d93b2' : primary} emissive={selected ? '#6d93b2' : primary} emissiveIntensity={0.5} roughness={0.9} />
+        </mesh>
+        <mesh position={[0.14, 0.36, 0]} castShadow>
+          <cylinderGeometry args={[0.075, 0.085, 0.72, 8]} />
+          <meshStandardMaterial color={selected ? '#6d93b2' : primary} emissive={selected ? '#6d93b2' : primary} emissiveIntensity={0.5} roughness={0.9} />
+        </mesh>
+        {/* 臂 ×2（微摆） */}
+        <mesh position={[-0.31, 1.28, 0]} rotation={[0.06, 0, 0.05]}>
+          <cylinderGeometry args={[0.05, 0.055, 0.5, 6]} />
+          <meshStandardMaterial color={primary} emissive={primary} emissiveIntensity={0.5} roughness={0.9} />
+        </mesh>
+        <mesh position={[0.31, 1.28, 0]} rotation={[0.06, 0, -0.05]}>
+          <cylinderGeometry args={[0.05, 0.055, 0.5, 6]} />
+          <meshStandardMaterial color={primary} emissive={primary} emissiveIntensity={0.5} roughness={0.9} />
+        </mesh>
+
+        {/* ---- 标志性配饰（按居民 id） ---- */}
+        {id === 'r1' && (
+          /* 蓑衣人：斗笠（宽檐圆锥） */
+          <mesh position={[0, 1.72, 0]} castShadow>
+            <coneGeometry args={[0.34, 0.16, 16]} />
+            <meshStandardMaterial color="#4a5a3e" emissive="#4a5a3e" emissiveIntensity={0.3} roughness={0.95} />
+          </mesh>
+        )}
+        {id === 'r2' && (
+          /* 阿岚：怀里花束 */
+          <mesh position={[0, 1.15, 0.22]} castShadow>
+            <sphereGeometry args={[0.13, 10, 8]} />
+            <meshStandardMaterial color="#b87d8a" emissive="#b87d8a" emissiveIntensity={0.5} roughness={0.7} />
+          </mesh>
+        )}
+        {id === 'r3' && (
+          /* 老王：围裙 */
+          <mesh position={[0, 1.0, 0.16]} castShadow>
+            <boxGeometry args={[0.4, 0.5, 0.04]} />
+            <meshStandardMaterial color="#d8cdb4" emissive="#d8cdb4" emissiveIntensity={0.3} roughness={0.9} />
+          </mesh>
+        )}
+        {id === 'r4' && (
+          /* 阿黎：手持纸人 */
+          <mesh position={[0.34, 1.1, 0.12]} castShadow>
+            <boxGeometry args={[0.08, 0.26, 0.06]} />
+            <meshStandardMaterial color="#e8e2d4" emissive="#e8e2d4" emissiveIntensity={0.4} roughness={0.85} />
+          </mesh>
+        )}
+        {id === 'r5' && (
+          /* 何叔：单片眼镜（眼前小圆环） */
+          <mesh position={[0.06, 1.58, 0.16]} rotation={[Math.PI / 2, 0, 0]}>
+            <torusGeometry args={[0.05, 0.012, 8, 16]} />
+            <meshStandardMaterial color="#8aa0b4" emissive="#8aa0b4" emissiveIntensity={0.5} roughness={0.4} metalness={0.6} />
+          </mesh>
+        )}
+        {id === 'r6' && (
+          /* 老鲞：肩扛渔网（肩上一团绳网） */
+          <mesh position={[0.26, 1.42, 0]} castShadow>
+            <sphereGeometry args={[0.14, 10, 8]} />
+            <meshStandardMaterial color="#c9b08a" emissive="#c9b08a" emissiveIntensity={0.3} roughness={1.0} />
+          </mesh>
+        )}
+        {id === 'r7' && (
+          /* 郑爷：胸前黄铜哨子 + 手提灯笼 */
+          <>
+            <mesh position={[0, 1.28, 0.17]} castShadow>
+              <sphereGeometry args={[0.045, 8, 6]} />
+              <meshStandardMaterial color="#b89a5a" emissive="#b89a5a" emissiveIntensity={0.6} roughness={0.3} metalness={0.7} />
+            </mesh>
+            <mesh position={[0.38, 0.85, 0.05]} castShadow>
+              <cylinderGeometry args={[0.09, 0.11, 0.22, 8]} />
+              <meshStandardMaterial color="#ffb15c" emissive="#ffb15c" emissiveIntensity={1.2} roughness={0.4} />
+            </mesh>
+          </>
+        )}
+        {id === 'r8' && (
+          /* 小满：怀抱布包（琥珀色） */
+          <mesh position={[0, 1.05, 0.2]} castShadow>
+            <boxGeometry args={[0.22, 0.2, 0.14]} />
+            <meshStandardMaterial color="#d8a24a" emissive="#d8a24a" emissiveIntensity={0.4} roughness={0.85} />
+          </mesh>
+        )}
+      </group>
+
       {/* 选中光环（暖光地面圈） */}
       {selected && (
         <mesh position={[0, 0.03, 0]} rotation={[-Math.PI / 2, 0, 0]}>
