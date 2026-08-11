@@ -17,6 +17,10 @@
     "./types": {
       "types": "./dist/types.d.ts",
       "import": "./dist/types.js"
+    },
+    "./death-lines": {
+      "types": "./dist/death-lines.d.ts",
+      "import": "./dist/death-lines.js"
     }
   },
   "scripts": {

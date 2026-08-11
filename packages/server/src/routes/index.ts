@@ -16,6 +16,7 @@ import type {
   FastifyRequest,
   FastifyReply,
 } from 'fastify';
+import { AppError } from '../utils/app-error.js';
 
 const ERROR_HTTP: Record<string, number> = {
   NO_QUESTIONS_LEFT: 403,
@@ -25,9 +26,11 @@ const ERROR_HTTP: Record<string, number> = {
 };
 
 function toError(err: unknown): { code: string; message: string; http: number } {
-  const msg = err instanceof Error ? err.message : 'UNKNOWN';
-  const http = ERROR_HTTP[msg] ?? 500;
-  return { code: msg, message: msg, http };
+  // AppError 用稳定 code 查表；非 AppError 用 message 兜底（兼容旧抛错）
+  const code =
+    err instanceof AppError ? err.code : err instanceof Error ? err.message : 'UNKNOWN';
+  const http = ERROR_HTTP[code] ?? 500;
+  return { code, message: code, http };
 }
 
 // ---- Zod Schemas ----

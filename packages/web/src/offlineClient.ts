@@ -9,6 +9,7 @@
  * 所有逻辑均为纯数据驱动，无任何网络 / token 消耗。
  */
 import { judgeAsk } from '@lunhui/engine/truth';
+import { DEATH_LINES } from '@lunhui/engine/death-lines';
 import type { AskResult, Resident } from '@lunhui/engine/types';
 import { RESIDENTS } from './residents';
 import { truthData } from './data/truthData.generated';
@@ -128,9 +129,7 @@ export const offlineApi = {
     return Promise.resolve({
       accepted: true,
       consequence:
-        choice === 'leave'
-          ? '你又上船了。第七次了。'
-          : '你留下来，也留不住。你本来就属于水里。',
+        choice === 'leave' ? DEATH_LINES.leave : DEATH_LINES.stay,
       loopStatus: 'ended',
     });
   },

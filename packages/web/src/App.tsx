@@ -11,6 +11,7 @@ import { ChoicePhase } from './components/ChoicePhase';
 import { DeathPhase } from './components/DeathPhase';
 import { MemoryPhase } from './components/MemoryPhase';
 import { portraitSrc, type PortraitVariant } from './portraits';
+import { DEATH_LINES } from '@lunhui/engine/death-lines';
 import './styles.css';
 
 // 视觉主题由 visual/theme 接管（App 注入 CSS 变量，RainNight 改用 theme token）；
@@ -131,9 +132,7 @@ export function App() {
       try {
         const res = await api.choice(loop.loopId, choice);
         setConsequence(res.consequence);
-        setDeathLine(
-          choice === 'leave' ? '你又上船了。第七次了。' : '你留下来，也留不住。你本来就属于水里。',
-        );
+        setDeathLine(DEATH_LINES[choice]);
         setPhase('death');
       } catch (err) {
         setDialogSpeaker('渡口');

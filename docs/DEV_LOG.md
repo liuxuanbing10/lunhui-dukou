@@ -6,6 +6,31 @@
 
 ---
 
+## 2026-08-11 · 场景重建（渡口小镇）+ 审计问题修复落地
+
+**本次内容**：
+1. **场景重建（场景感）**：RainNight 加程序化渡口小镇——近景栈桥+木桩+3 盏暖光灯笼 → 中景汤碗+渡船剪影+船灯 → 远景钟楼（钟面微光）/面馆（窗光）/花店剪影，雾距收紧（5.5-17）增强纵深，相机拉远（y1.9 z8.5）看全景、silence 推近（z4.6）面对渡口。全部几何体程序化，零资产。
+2. **NPC 立绘进场景**：蓑衣人 billboard 站在栈桥渡口（1.25×3.4，alphaTest=0.3 透明，每帧对齐相机）。踩坑：R3F useLoader 挂起 → EffectComposer.addPass 读 null 白屏，改 TextureLoader+ready state 修复；立绘 PNG 做 gamma 1.35 提亮。
+3. **审计问题修复**（此前报告全部落地）：
+   - P1-1 主题双轨制：styles.css 改为别名层（--ink/--accent 等映射 theme.ts 注入的 --c-*，带兜底），theme.ts 增 ui.accent；
+   - P1-2 死亡后果文案三处重复 → engine `death-lines.ts` 单一真源（server/web/offline 三端引用）；
+   - P1-3 livingTown 居民复制 → 由 RESIDENTS 派生 + INTERROGATES 表；
+   - P2 死代码：删 useAudio.ts、Portrait.tsx（右侧浮窗方案被场景 billboard 取代）、RainNight 的 SILENCE_MS re-export、styles.css .silence 类；
+   - P2-3 错误码：新增 AppError 类（code 稳定），loop-service 抛 AppError，routes/toError 按 code 查表。
+
+**决策**：
+- web 端禁止 import `@lunhui/engine` 主入口（含 node:fs resident-loader，浏览器崩溃）——DEATH_LINES 走新子路径 `@lunhui/engine/death-lines`（package.json exports 新增）；
+- 立绘 PNG 未压缩（body 688KB/face_hit 1.27MB），后续转 WebP 优化。
+
+**坑**：
+- vite dev 不重启，package.json exports 变更不生效（App.tsx 500 + node:fs externalized 残留）——改 exports 必须重启 vite；
+- tsconfig noUncheckedIndexedAccess：元组解构得 `number|undefined`，需显式类型标注数据数组；
+- engine 改 src 后必须 rebuild（server/web 解析 dist 产物）。
+
+**下一步**：r2 阿岚立绘生产；跑图（WASD 移动 + 站位）骨架；立绘 WebP 压缩。
+
+---
+
 ## 2026-08-11 · 视觉风格定稿：写实电影感 + 立绘提示词投喂包 + 3D 跑图方向
 
 **本次内容**：

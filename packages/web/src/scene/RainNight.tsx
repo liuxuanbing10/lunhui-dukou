@@ -20,9 +20,165 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { EffectComposer, Bloom, Vignette, Noise } from '@react-three/postprocessing';
 import * as THREE from 'three';
 import { theme } from '../visual/theme';
-import { SILENCE_MS } from '../audio/audio';
 
 export type RainMode = 'idle' | 'silence' | 'memory';
+
+/**
+ * 渡口小镇环境（全程序化几何，零资产）：
+ * 近景栈桥 + 灯柱 → 中景汤碗/渡船 → 远景建筑剪影（钟楼/面馆/花店），雾中层次。
+ * 色值全部来自 theme token，禁止内联 hex。
+ */
+function Townscape() {
+  const wood = useMemo(
+    () => new THREE.MeshStandardMaterial({ color: '#2a3a4a', roughness: 0.85, metalness: 0.05 }),
+    [],
+  );
+  const woodLight = useMemo(
+    () => new THREE.MeshStandardMaterial({ color: '#3a4e60', roughness: 0.8, metalness: 0.05 }),
+    [],
+  );
+  const silhouette = useMemo(() => new THREE.MeshBasicMaterial({ color: '#0c1722' }), []);
+  const silhouetteDim = useMemo(() => new THREE.MeshBasicMaterial({ color: '#0a131d' }), []);
+  const rock = useMemo(() => new THREE.MeshStandardMaterial({ color: '#1a2634', roughness: 1 }), []);
+  const lantern = useMemo(
+    () => new THREE.MeshBasicMaterial({ color: theme.warm.glow, toneMapped: false }),
+    [],
+  );
+
+  // 栈桥木板（近景 → 渡口），浮于水面（y≈-0.55）之上
+  const planks = [-3.6, -3.0, -2.4, -1.8, -1.2, -0.6, 0.0, 0.6, 1.2, 1.8, 2.4, 3.0, 3.6, 4.2].map((z) => (
+    <mesh key={`p${z}`} position={[0, 0.06, z]}>
+      <boxGeometry args={[2.6, 0.09, 0.5]} />
+      <primitive object={z < -0.6 ? wood : woodLight} attach="material" />
+    </mesh>
+  ));
+
+  // 栈桥桩
+  const postData: Array<[number, number, number]> = [
+    [-1.2, 0.4, -0.6], [1.2, 0.4, -0.6], [-1.2, 0.4, -2.4], [1.2, 0.4, -2.4],
+  ];
+  const posts = postData.map(([x, y, z], i) => (
+    <mesh key={`po${i}`} position={[x, y, z]}>
+      <boxGeometry args={[0.14, 1.0, 0.14]} />
+      <primitive object={rock} attach="material" />
+    </mesh>
+  ));
+
+  // 灯柱（暖光灯笼）
+  const lampData: Array<[number, number, number]> = [
+    [-1.9, 1.35, 1.2], [2.1, 1.35, 0.4], [-1.9, 1.35, -1.8],
+  ];
+  const lampPosts = lampData.map(([x, y, z], i) => (
+    <group key={`lp${i}`} position={[x, y, z]}>
+      <mesh position={[0, -0.7, 0]}>
+        <cylinderGeometry args={[0.045, 0.06, 1.4, 6]} />
+        <primitive object={silhouette} attach="material" />
+      </mesh>
+      <mesh position={[0, 0.05, 0]}>
+        <sphereGeometry args={[0.16, 8, 8]} />
+        <primitive object={lantern} attach="material" />
+      </mesh>
+    </group>
+  ));
+
+  // 渡船剪影（水面右侧）
+  const ferry = (
+    <group position={[3.1, -0.28, -2.8]}>
+      <mesh position={[0, 0.12, 0]}>
+        <boxGeometry args={[2.1, 0.42, 0.85]} />
+        <primitive object={silhouette} attach="material" />
+      </mesh>
+      <mesh position={[0, 0.5, 0]} rotation={[0, 0, 0.16]}>
+        <cylinderGeometry args={[0.035, 0.035, 0.8, 5]} />
+        <primitive object={silhouette} attach="material" />
+      </mesh>
+      <mesh position={[0, 0.62, 0]} rotation={[0.2, 0, 0]}>
+        <boxGeometry args={[0.9, 0.55, 0.06]} />
+        <primitive object={silhouette} attach="material" />
+      </mesh>
+      {/* 船头小灯 */}
+      <mesh position={[0, 0.95, 0]}>
+        <sphereGeometry args={[0.07, 6, 6]} />
+        <primitive object={lantern} attach="material" />
+      </mesh>
+    </group>
+  );
+
+  // 远景建筑剪影（雾中）
+  const clockTower = (
+    <group position={[-4.4, 0, -7.5]}>
+      <mesh position={[0, 2.4, 0]}>
+        <boxGeometry args={[1.3, 4.8, 1.3]} />
+        <primitive object={silhouetteDim} attach="material" />
+      </mesh>
+      <mesh position={[0, 5.3, 0]}>
+        <coneGeometry args={[0.85, 1.6, 4]} />
+        <primitive object={silhouetteDim} attach="material" />
+      </mesh>
+      {/* 钟面微光 */}
+      <mesh position={[0.65, 3.1, 0]}>
+        <circleGeometry args={[0.22, 8]} />
+        <primitive object={lantern} attach="material" />
+      </mesh>
+    </group>
+  );
+  const noodleShop = (
+    <group position={[3.6, 0, -6.2]}>
+      <mesh position={[0, 1.0, 0]}>
+        <boxGeometry args={[2.4, 2.0, 1.8]} />
+        <primitive object={silhouette} attach="material" />
+      </mesh>
+      <mesh position={[0, 2.15, 0]}>
+        <coneGeometry args={[1.9, 1.2, 4]} />
+        <primitive object={silhouette} attach="material" />
+      </mesh>
+      {/* 窗暖光 */}
+      <mesh position={[0, 1.15, 0.91]}>
+        <planeGeometry args={[0.5, 0.4]} />
+        <primitive object={lantern} attach="material" />
+      </mesh>
+    </group>
+  );
+  const flowerShop = (
+    <group position={[5.0, 0, -4.6]}>
+      <mesh position={[0, 0.75, 0]}>
+        <boxGeometry args={[1.6, 1.5, 1.5]} />
+        <primitive object={silhouetteDim} attach="material" />
+      </mesh>
+      <mesh position={[0, 1.6, 0]}>
+        <coneGeometry args={[1.25, 0.9, 4]} />
+        <primitive object={silhouetteDim} attach="material" />
+      </mesh>
+    </group>
+  );
+
+  // 岸堤岩石（左侧前景）
+  const rockData: Array<[number, number, number, [number, number, number]]> = [
+    [-3.1, 0.1, 1.8, [1.6, 0.7, 1.2]],
+    [-2.7, -0.05, 3.4, [1.1, 0.45, 0.9]],
+    [-3.5, 0.0, -0.4, [1.4, 0.55, 1.0]],
+    [-2.9, -0.15, -2.6, [1.8, 0.5, 1.2]],
+  ];
+  const rocks = rockData.map(([x, y, z, s], i) => (
+    <mesh key={`rk${i}`} position={[x, y, z]}>
+      <boxGeometry args={[s[0], s[1], s[2]]} />
+      <primitive object={rock} attach="material" />
+    </mesh>
+  ));
+
+  return (
+    <group>
+      {planks}
+      {posts}
+      {lampPosts}
+      {ferry}
+      {clockTower}
+      {noodleShop}
+      {flowerShop}
+      {rocks}
+    </group>
+  );
+}
 
 /**
  * NPC billboard：居民立绘贴进 3D 场景（渡口汤碗旁），始终面向相机。
@@ -46,8 +202,8 @@ function NpcBillboard({ textureUrl }: { textureUrl: string }) {
 
   if (!ready) return null;
   return (
-    <mesh ref={meshRef} position={[0.9, 2.0, 1.4]}>
-      <planeGeometry args={[1.9, 5.2]} />
+    <mesh ref={meshRef} position={[0.85, 1.72, 0.1]}>
+      <planeGeometry args={[1.25, 3.4]} />
       <meshBasicMaterial
         map={texture}
         alphaMap={texture}
@@ -202,14 +358,14 @@ function RainScene({ mode, npcTexture }: { mode: RainMode; npcTexture: string | 
     rippleMat.uniforms.uPulse!.value =
       mode === 'silence' ? Math.max(pulseRef.current, 0.35) : pulseRef.current;
 
-    // 相机视差（景深感，不晃眼）
+    // 相机视差（景深感，不晃眼；silence 时推近面对渡口）
     const targetX = mode === 'silence' ? 0 : Math.sin(t * 0.3) * 0.7;
-    const targetZ = mode === 'silence' ? 4.4 : 6.2 + Math.sin(t * 0.22) * 0.5;
-    const targetY = 1.3;
+    const targetZ = mode === 'silence' ? 4.6 : 8.2 + Math.sin(t * 0.22) * 0.5;
+    const targetY = mode === 'silence' ? 1.45 : 1.9;
     camera.position.x += (targetX - camera.position.x) * k;
     camera.position.y += (targetY - camera.position.y) * k;
     camera.position.z += (targetZ - camera.position.z) * k;
-    camera.lookAt(0, 1.1, 0);
+    camera.lookAt(0, 0.9, -0.6);
 
     // 雨：下落并回收（silence 段减弱雨势）
     const mesh = rainRef.current;
@@ -295,6 +451,9 @@ function RainScene({ mode, npcTexture }: { mode: RainMode; npcTexture: string | 
         ))}
       </group>
 
+      {/* 渡口小镇（栈桥/灯柱/渡船/建筑剪影） */}
+      <Townscape />
+
       {/* 雨：instanced 线条（单 draw call） */}
       <instancedMesh
         ref={rainRef}
@@ -322,11 +481,11 @@ export function RainNight({
       // 固定全屏、置于相位 UI 之下（UI z-index:1），不拦截指针事件
       style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none' }}
       dpr={[1, 2]}
-      camera={{ position: [0, 1.3, 6.2], fov: 50 }}
+      camera={{ position: [0, 1.9, 8.5], fov: 50 }}
       gl={{ antialias: true, powerPreference: 'high-performance' }}
     >
       <color attach="background" args={[theme.rain.base]} />
-      <fog attach="fog" args={[theme.rain.base, 7, 20]} />
+      <fog attach="fog" args={[theme.rain.base, 5.5, 17]} />
       <RainScene mode={mode} npcTexture={npcTexture} />
       <EffectComposer>
         <Bloom
@@ -344,5 +503,3 @@ export function RainNight({
 
 // 默认导出供 App 侧 React.lazy 动态分包（three/R3F 不阻塞首屏）
 export default RainNight;
-
-export { SILENCE_MS };

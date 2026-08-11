@@ -1,11 +1,14 @@
+/*
+ * 颜色真源在 visual/theme.ts（App 启动时 injectThemeVars 注入 --c-* 自定义属性）。
+ * 本 :root 仅为可读别名层：--ink 等短名映射到 --c-*，带兜底值（防注入前 FOUC）。
+ */
 :root {
-  --ink: #c9d1d9;
-  --ink-dim: #8b949e;
-  --ink-faint: #484f58;
-  --night: #0a0e14;
-  --night-2: #0d1117;
-  --accent: #58a6ff;
-  --danger: #f85149;
+  --ink: var(--c-ink-primary, #e8eef5);
+  --ink-dim: var(--c-ink-dim, #8aa0b4);
+  --ink-faint: var(--c-ink-faint, #4a5b6e);
+  --night: var(--c-rain-base, #0b1a2b);
+  --accent: var(--c-ui-accent, #58a6ff);
+  --danger: var(--c-ui-danger, #c0473b);
   --serif: 'Noto Serif SC', 'Songti SC', 'SimSun', serif;
 }
 
@@ -256,16 +259,7 @@ body {
   color: var(--danger);
 }
 
-/* ---- 沉默演出 ---- */
-.silence {
-  color: var(--danger);
-  text-align: center;
-  font-size: 15px;
-  letter-spacing: 0.3em;
-  margin-top: 8px;
-  animation: fadeIn 1.2s ease;
-}
-
+/* ---- 轮回重置演出 ---- */
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -275,7 +269,6 @@ body {
   }
 }
 
-/* ---- 轮回重置演出 ---- */
 .loop-flash {
   position: fixed;
   inset: 0;

@@ -5,3 +5,4 @@
 export * from './types.js';
 export * from './truth-table.js';
 export * from './resident-loader.js';
+export * from './death-lines.js';

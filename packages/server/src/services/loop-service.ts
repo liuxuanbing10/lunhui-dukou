@@ -6,8 +6,9 @@
  * 判定：命中真相表 → 纯规则（不调 LLM）；未命中 → LLM 血肉层（sophnet→deepseek→保守兜底）
  */
 import type { Database } from 'better-sqlite3';
-import { judgeAsk } from '@lunhui/engine';
+import { judgeAsk, DEATH_LINES } from '@lunhui/engine';
 import type { AnswerMode } from '@lunhui/engine';
+import { AppError } from '../utils/app-error.js';
 import { generateAnswer } from './llm-generator.js';
 import {
   addEvent,
@@ -131,21 +132,21 @@ export async function askQuestion(
 ): Promise<AskOutcome> {
   const loop = getLoop(db, loopId);
   if (!loop) {
-    throw new Error('LOOP_NOT_FOUND');
+    throw new AppError('LOOP_NOT_FOUND');
   }
   if (loop.status !== 'active') {
-    throw new Error('LOOP_ENDED');
+    throw new AppError('LOOP_ENDED');
   }
 
   // 额度强制（server 层）
   const asked = countQuestionsInLoop(db, loopId);
   if (asked >= MAX_QUESTIONS) {
-    throw new Error('NO_QUESTIONS_LEFT');
+    throw new AppError('NO_QUESTIONS_LEFT');
   }
 
   const row = getResidentRow(db, residentId);
   if (!row || row.is_active === 0) {
-    throw new Error('RESIDENT_NOT_ACTIVE');
+    throw new AppError('RESIDENT_NOT_ACTIVE');
   }
   const resident = rowToResident(row);
 
@@ -194,12 +195,12 @@ export function makeChoice(
 ): ChoiceOutcome {
   const loop = getLoop(db, loopId);
   if (!loop) {
-    throw new Error('LOOP_NOT_FOUND');
+    throw new AppError('LOOP_NOT_FOUND');
   }
 
   const consequences: Record<string, string> = {
-    leave: '船在河心沉没。你从水里又醒来——第七次了。',
-    stay: '你留下来，也留不住。你本来就属于水里。',
+    leave: DEATH_LINES.leave,
+    stay: DEATH_LINES.stay,
   };
   const consequence = consequences[choice] ?? '（你做了选择。天亮时，轮回重置了。）';
 
