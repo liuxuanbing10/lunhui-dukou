@@ -265,30 +265,61 @@ float noise(vec2 p) {
   );
 }
 
+/* 雨滴同心圆涟漪：随机落点 + 扩散圈 + 随时间淡出 */
+float rainRings(vec2 uv, float t) {
+  float acc = 0.0;
+  vec2 cell = floor(uv * 40.0);
+  vec2 f = fract(uv * 40.0);
+  float r1 = hash(cell);
+  float r2 = hash(cell + 7.31);
+  vec2 dropPos = vec2(r1, r2);
+  float t0 = fract(t * (0.5 + r1 * 0.4) + r2 * 17.0);
+  float age = t0;                 // 0..1 涟漪年龄
+  float radius = age * 0.9;
+  float ring = abs(length(f - dropPos) - radius);
+  float fade = (1.0 - age) * smoothstep(0.10, 0.0, ring);
+  acc += fade * (r1 > 0.55 ? 1.0 : 0.0);
+  return acc;
+}
+
 void main() {
   vec2 c = vUv - vec2(0.5, 0.62);          // 涟漪中心对位汤碗（略偏画面深处）
   float d = length(c);
 
-  // 基础水面：两层漂移噪声
+  // 基础水面：三层漂移噪声（大波纹 + 中波 + 细碎闪光）
   float n = noise(vUv * 14.0 + vec2(uTime * 0.18, uTime * 0.11));
   n += 0.5 * noise(vUv * 30.0 - vec2(uTime * 0.26, 0.0));
+  float fine = noise(vUv * 90.0 + vec2(uTime * 0.4, -uTime * 0.2));
 
   // 环状涟漪：常态缓，脉冲时加密加快（命中真相的一次「心跳」）
   float ring = sin(d * 60.0 - uTime * 2.0) * 0.5 + 0.5;
   float pulseRing = sin(d * 90.0 - uTime * 7.0) * 0.5 + 0.5;
   float rings = mix(ring * 0.15, pulseRing * 0.8, uPulse);
 
+  // 雨滴落水的随机同心圆
+  float drops = rainRings(vUv, uTime) * 0.6;
+
   // 径向衰减：边缘溶进雾里
   float fade = smoothstep(0.55, 0.15, d);
 
-  // 汤碗暖光在水面的倒影光柱
-  float warmCol = smoothstep(0.16, 0.0, abs(c.x)) * smoothstep(0.45, 0.0, d);
+  // ---- 灯影倒影（R4）：汤碗暖光 + 两侧窗灯，竖直拉长并被波纹扭曲 ----
+  float distort = (noise(vUv * vec2(18.0, 55.0) + vec2(0.0, uTime * 0.5)) - 0.5) * 0.06;
+  vec2 rv = vUv + vec2(distort, 0.0);
+  // 汤碗中央光柱
+  float warmCol = smoothstep(0.14, 0.0, abs(rv.x - 0.5)) * smoothstep(0.5, 0.0, d);
+  // 左右窗灯倒影（两条偏光柱，随 uTime 微动）
+  float win1 = smoothstep(0.035, 0.0, abs(rv.x - 0.28 + sin(uTime*0.3)*0.004));
+  float win2 = smoothstep(0.035, 0.0, abs(rv.x - 0.74 + sin(uTime*0.26+1.7)*0.004));
+  float winFade = smoothstep(0.30, 0.75, rv.y); // 只在上半段（远处）出现
+  float windows = (win1 + win2) * winFade;
 
   vec3 col = mix(uDeep, uMist, n * 0.55 + rings * 0.3);
-  col += uHighlight * rings * 0.12;
-  col += uWarm * warmCol * (0.18 + uPulse * 0.35);
+  col += uHighlight * (rings * 0.12 + drops * 0.35 + fine * 0.05);
+  col += uWarm * warmCol * (0.18 + uPulse * 0.35 + fine * 0.2);
+  col += uWarm * windows * (0.55 + fine * 0.4);
+  col += vec3(0.35, 0.5, 0.7) * drops * 0.25; // 雨滴泛蓝高光
 
-  float alpha = fade * (0.55 + rings * 0.2 + uPulse * 0.15);
+  float alpha = fade * (0.55 + rings * 0.2 + drops * 0.15 + uPulse * 0.15);
   gl_FragColor = vec4(col, alpha);
 }
 `;
@@ -300,6 +331,60 @@ const GHOSTS = [
   { pos: [1.4, 0.2, 0.4], size: [1.3, 2.6], color: theme.memory.rust, phase: 2.1 },
   { pos: [0.2, -0.4, -0.6], size: [2.0, 2.2], color: theme.memory.ghost, phase: 4.2 },
 ] as const;
+
+/**
+ * 雨滴落水溅落（R7 细节）：水面随机分布的闪烁粒子，随时间在随机位置
+ * 短暂亮起又熄灭，模拟雨点打在水面的一瞬微光。单 draw call。
+ */
+const SPLASH_COUNT = 120;
+function SplashPoints() {
+  const geoRef = useRef<THREE.BufferGeometry>(null);
+  const positions = useMemo(() => {
+    const arr = new Float32Array(SPLASH_COUNT * 3);
+    for (let i = 0; i < SPLASH_COUNT; i++) {
+      arr[i * 3] = (Math.random() - 0.5) * 20;
+      arr[i * 3 + 1] = -0.52; // 水面略高
+      arr[i * 3 + 2] = (Math.random() - 0.5) * 3.2;
+    }
+    return arr;
+  }, []);
+  const phases = useMemo(() => new Float32Array(SPLASH_COUNT).map(() => Math.random() * Math.PI * 2), []);
+
+  useFrame(({ clock }) => {
+    const geo = geoRef.current;
+    if (!geo) return;
+    const t = clock.getElapsedTime();
+    const colors = new Float32Array(SPLASH_COUNT * 3);
+    for (let i = 0; i < SPLASH_COUNT; i++) {
+      // 每颗粒子按各自相位周期性闪烁
+      const v = Math.max(0, Math.sin(t * 3.0 + (phases[i] ?? 0)));
+      const bright = v * v * v;
+      // 偶发暖光（近汤碗），多为冷光
+      const px = positions[i * 3] ?? 0;
+      const warm = px > -1.5 && px < 1.5;
+      colors[i * 3] = warm ? bright * 1.0 : bright * 0.55;
+      colors[i * 3 + 1] = warm ? bright * 0.8 : bright * 0.7;
+      colors[i * 3 + 2] = bright * 0.85;
+    }
+    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  });
+
+  return (
+    <points>
+      <bufferGeometry ref={geoRef}>
+        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
+      </bufferGeometry>
+      <pointsMaterial
+        size={0.09}
+        vertexColors
+        transparent
+        opacity={0.9}
+        depthWrite={false}
+        sizeAttenuation
+      />
+    </points>
+  );
+}
 
 function RainScene({
   mode,
@@ -528,18 +613,21 @@ function RainScene({
       onNearChange(nearId);
     }
 
-    // 雨：下落并回收（silence 段减弱雨势）
+    // 雨：斜落（风向漂移 + 整体倾斜）并回收（silence 段减弱雨势）
     const mesh = rainRef.current;
     if (mesh) {
       mesh.count = mode === 'silence' ? RAIN_COUNT_SILENCE : RAIN_COUNT;
+      mesh.rotation.z = -0.10; // 斜雨倾角（风向 -x）
       for (let i = 0; i < mesh.count; i++) {
         const drop = drops[i];
         if (!drop) continue;
         drop.y -= drop.speed * dt;
+        drop.x -= drop.speed * dt * 0.18; // 风向漂移
         if (drop.y < -2.5) {
           drop.y = 14 + Math.random() * 4;
           drop.x = (Math.random() - 0.5) * 22;
         }
+        if (drop.x < -12) drop.x += 24;
         dummy.position.set(drop.x, drop.y, drop.z);
         dummy.scale.set(0.018, drop.len, 0.018);
         dummy.updateMatrix();
@@ -603,9 +691,9 @@ function RainScene({
         <meshBasicMaterial color={theme.warm.soul} toneMapped={false} transparent opacity={0.9} />
       </mesh>
 
-      {/* 水面涟漪：噪声 + 正弦扰动着色器（单 draw call，无贴图） */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.55, -2]}>
-        <planeGeometry args={[44, 34, 1, 1]} />
+      {/* 水面倒影：河道专用平面（覆盖 GLB river_main，UV 对应河道 x[-11,11] z[-1.6,1.6]） */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.53, 0]}>
+        <planeGeometry args={[22, 3.4, 1, 1]} />
         <primitive object={rippleMat} attach="material" />
       </mesh>
 
@@ -631,7 +719,9 @@ function RainScene({
         <meshBasicMaterial ref={rainMat} color={theme.rain.drop} transparent opacity={0.5} depthWrite={false} />
       </instancedMesh>
 
-      {/* 居民立绘（billboard）：站在渡口汤碗旁，始终面向玩家 */}
+      {/* 雨滴落水溅落（Points，水面随机闪光，R7 细节） */}
+      <SplashPoints />
+
       {/* 场景居民：3D 立体人形（角色色签，受汤碗暖光），点击选中 */}
       {RESIDENT_SPOTS.map((s) => (
         <group key={s.id} position={[s.pos[0], 0, s.pos[2]]}>
