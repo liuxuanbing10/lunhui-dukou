@@ -9,41 +9,20 @@ import { DeathPhase } from './DeathPhase';
 const noop = () => {};
 
 describe('AskingPhase', () => {
-  it('渲染全部居民 chips 与提问区', () => {
+  it('渲染提问区与剩余次数（居民选择已移至场景点击）', () => {
     render(
       <AskingPhase
-        residentIds={['r1', 'r2']}
-        selected="r1"
         question=""
         questionsLeft={10}
         busy={false}
         inputRef={{ current: null }}
-        onSelect={noop}
         onQuestionChange={noop}
         onAsk={noop}
       />,
     );
-    expect(screen.getByText(/蓑衣人/)).toBeTruthy();
-    expect(screen.getByText(/阿岚/)).toBeTruthy();
+    expect(screen.getByPlaceholderText(/向渡口的人提问/)).toBeTruthy();
     expect(screen.getByText('本轮回剩余问题：10 / 10')).toBeTruthy();
-  });
-
-  it('选中居民高亮', () => {
-    render(
-      <AskingPhase
-        residentIds={['r1', 'r2']}
-        selected="r2"
-        question=""
-        questionsLeft={10}
-        busy={false}
-        inputRef={{ current: null }}
-        onSelect={noop}
-        onQuestionChange={noop}
-        onAsk={noop}
-      />,
-    );
-    const chip = screen.getByText(/阿岚/);
-    expect(chip.className).toContain('selected');
+    expect(screen.getByRole('button', { name: '问' })).toBeTruthy();
   });
 
   it('输入问题后可触发提问，空问题禁用按钮', async () => {
@@ -51,13 +30,10 @@ describe('AskingPhase', () => {
     let asked = false;
     render(
       <AskingPhase
-        residentIds={['r1']}
-        selected="r1"
         question="你捞过我吗"
         questionsLeft={9}
         busy={false}
         inputRef={{ current: null }}
-        onSelect={noop}
         onQuestionChange={noop}
         onAsk={() => {
           asked = true;

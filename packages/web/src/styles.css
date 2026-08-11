@@ -81,51 +81,50 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  padding: 24px;
+  padding: 16px;
 }
 
 /* ---- 标题 ---- */
 .title {
-  font-size: 42px;
+  font-size: 38px;
   letter-spacing: 0.5em;
   text-indent: 0.5em;
   color: var(--ink);
   text-shadow: 0 0 24px rgba(88, 166, 255, 0.25);
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .subtitle {
-  font-size: 14px;
+  font-size: 13px;
   letter-spacing: 0.3em;
   color: var(--ink-dim);
-  margin-bottom: 40px;
+  margin-bottom: 16px;
 }
 
-/* ---- 对话窗（字幕式：下沉透明，露出场景中站立的 NPC） ---- */
+/* ---- 对话窗（字幕式：底部细条，露出场景中站立的人物供点击） ---- */
 .dialog {
   width: min(560px, 88vw);
-  min-height: 150px;
   margin-top: auto;
-  margin-bottom: 5vh;
-  background: rgba(13, 17, 23, 0.62);
+  margin-bottom: 2vh;
+  background: rgba(13, 17, 23, 0.55);
   border: 1px solid rgba(88, 166, 255, 0.18);
   border-radius: 8px;
-  padding: 18px 22px;
+  padding: 10px 16px;
   box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(3px);
 }
 
 .dialog-speaker {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--accent);
   letter-spacing: 0.2em;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
 }
 
 .dialog-text {
-  font-size: 17px;
-  line-height: 1.9;
-  min-height: 72px;
+  font-size: 15px;
+  line-height: 1.7;
+  min-height: 52px;
   white-space: pre-wrap;
 }
 
@@ -146,7 +145,7 @@ body {
 
 /* ---- 输入区 ---- */
 .ask-area {
-  margin-top: 20px;
+  margin-top: 10px;
   display: flex;
   gap: 8px;
 }
@@ -158,8 +157,8 @@ body {
   border-radius: 6px;
   color: var(--ink);
   font-family: var(--serif);
-  font-size: 15px;
-  padding: 10px 14px;
+  font-size: 14px;
+  padding: 7px 12px;
   outline: none;
 }
 
@@ -172,9 +171,9 @@ body {
   border: 1px solid rgba(88, 166, 255, 0.5);
   color: var(--accent);
   border-radius: 6px;
-  padding: 10px 20px;
+  padding: 7px 18px;
   font-family: var(--serif);
-  font-size: 15px;
+  font-size: 14px;
   cursor: pointer;
   transition: background 0.2s;
 }
@@ -186,37 +185,6 @@ body {
 .ask-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
-}
-
-/* ---- 居民选择 ---- */
-.resident-bar {
-  margin-top: 16px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: center;
-}
-
-.resident-chip {
-  background: rgba(22, 27, 34, 0.8);
-  border: 1px solid rgba(139, 148, 158, 0.25);
-  border-radius: 999px;
-  color: var(--ink-dim);
-  padding: 6px 14px;
-  font-size: 13px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.resident-chip:hover {
-  border-color: var(--accent);
-  color: var(--ink);
-}
-
-.resident-chip.selected {
-  border-color: var(--accent);
-  color: var(--accent);
-  background: rgba(88, 166, 255, 0.1);
 }
 
 /* ---- 额度 ---- */

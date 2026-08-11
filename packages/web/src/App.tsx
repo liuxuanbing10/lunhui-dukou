@@ -4,7 +4,6 @@ import { residentName } from './residents';
 import { useTypewriter } from './hooks/useTypewriter';
 import { injectThemeVars } from './visual/theme';
 import { createAudioEngine, SILENCE_MS, type AudioEngine } from './audio/audio';
-import { livingTownResidents } from './content/livingTown';
 import { Rain } from './components/Rain';
 import { AskingPhase } from './components/AskingPhase';
 import { ChoicePhase } from './components/ChoicePhase';
@@ -167,13 +166,24 @@ export function App() {
 
   const showTypewriter = phase === 'intro' || phase === 'memory';
 
+  // 场景点击选人（替代居民按钮）；换人重置表情为 body
+  const handleSelectResident = (id: string) => {
+    setSelected(id);
+    setPortraitVariant('body');
+  };
+
   // RainNight 视觉模式：由当前相位推导（命中关键 → silence 收束；memory 相位 → 记忆叠影；其余 idle）
   const rainMode: RainMode = silenceActive ? 'silence' : phase === 'memory' ? 'memory' : 'idle';
 
   return (
     <>
       <Suspense fallback={null}>
-        <RainNight mode={rainMode} npcTexture={portraitSrc(selected, portraitVariant) ?? null} />
+        <RainNight
+          mode={rainMode}
+          npcTexture={portraitSrc(selected, portraitVariant) ?? null}
+          selected={selected}
+          onSelectResident={handleSelectResident}
+        />
       </Suspense>
       <Rain />
       <div className="stage">
@@ -189,16 +199,10 @@ export function App() {
 
           {phase === 'intro' && loop && (
             <AskingPhase
-              residentIds={livingTownResidents.map((r) => r.id)}
-              selected={selected}
               question={question}
               questionsLeft={questionsLeft}
               busy={busy}
               inputRef={inputRef}
-              onSelect={(id) => {
-                setSelected(id);
-                setPortraitVariant('body');
-              }}
               onQuestionChange={setQuestion}
               onAsk={handleAsk}
             />

@@ -25,6 +25,70 @@ import { theme } from '../visual/theme';
 export type RainMode = 'idle' | 'silence' | 'memory';
 
 /**
+ * 场景居民站位（世界坐标，对应 Blender GLB 渡口布局）。
+ * r1 用写实立绘 billboard；其余暂用剪影人形（立绘生产后逐个替换）。
+ */
+const RESIDENT_SPOTS: Array<{ id: string; pos: [number, number, number] }> = [
+  { id: 'r1', pos: [0.85, 0, 0.1] }, // 栈桥汤碗旁（立绘，屏幕内已验证）
+  { id: 'r2', pos: [2.0, 0, -0.5] }, // 栈桥右侧中景
+  { id: 'r3', pos: [-2.0, 0, -0.5] }, // 栈桥左侧中景
+  { id: 'r4', pos: [-0.8, 0, -2.2] }, // 左中远
+  { id: 'r5', pos: [1.6, 0, -2.4] }, // 右中远
+  { id: 'r6', pos: [3.0, 0, -1.6] }, // 渡船边
+  { id: 'r7', pos: [-2.4, 0, -1.2] }, // 左
+  { id: 'r8', pos: [0.4, 0, -3.4] }, // 中央远（钟楼方向）
+];
+
+/** 剪影人形（未出立绘的居民占位；点击选中） */
+function ResidentSilhouette({
+  id,
+  pos,
+  selected,
+  onSelect,
+}: {
+  id: string;
+  pos: [number, number, number];
+  selected: boolean;
+  onSelect: (id: string) => void;
+}) {
+  const bodyColor = selected ? '#27485e' : '#0d1826';
+  const headColor = selected ? '#33576e' : '#101d2c';
+  return (
+    <group
+      position={pos}
+      onClick={(e) => {
+        e.stopPropagation();
+        onSelect(id);
+      }}
+      onPointerOver={() => {
+        document.body.style.cursor = 'pointer';
+      }}
+      onPointerOut={() => {
+        document.body.style.cursor = 'auto';
+      }}
+    >
+      {/* 身体（蓑衣/长袍轮廓） */}
+      <mesh position={[0, 0.7, 0]}>
+        <cylinderGeometry args={[0.2, 0.28, 1.4, 8]} />
+        <meshBasicMaterial color={bodyColor} />
+      </mesh>
+      {/* 头 */}
+      <mesh position={[0, 1.55, 0]}>
+        <sphereGeometry args={[0.17, 8, 8]} />
+        <meshBasicMaterial color={headColor} />
+      </mesh>
+      {/* 选中光环 */}
+      {selected && (
+        <mesh position={[0, 0.04, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[0.4, 0.52, 24]} />
+          <meshBasicMaterial color={theme.warm.glow} transparent opacity={0.75} toneMapped={false} />
+        </mesh>
+      )}
+    </group>
+  );
+}
+
+/**
  * 渡口小镇（Blender 建模 GLB：栈桥/建筑剪影/渡船/灯笼/汤碗台座）。
  * 异步加载，加载完成前不渲染（避免挂起影响 EffectComposer）。
  */
@@ -53,7 +117,15 @@ function DukouModel() {
  * NPC billboard：居民立绘贴进 3D 场景（渡口汤碗旁），始终面向相机。
  * 切换贴图（换人/换表情）时通过 key 强制重挂载 → opacity 从 0 淡入。
  */
-function NpcBillboard({ textureUrl }: { textureUrl: string }) {
+function NpcBillboard({
+  textureUrl,
+  selected,
+  onSelect,
+}: {
+  textureUrl: string;
+  selected: boolean;
+  onSelect: () => void;
+}) {
   const [ready, setReady] = useState(false);
   const texture = useMemo(() => {
     const t = new THREE.TextureLoader().load(textureUrl, () => setReady(true));
@@ -71,7 +143,20 @@ function NpcBillboard({ textureUrl }: { textureUrl: string }) {
 
   if (!ready) return null;
   return (
-    <mesh ref={meshRef} position={[0.85, 1.72, 0.1]}>
+    <mesh
+      ref={meshRef}
+      position={[0.85, 1.72, 0.1]}
+      onClick={(e) => {
+        e.stopPropagation();
+        onSelect();
+      }}
+      onPointerOver={() => {
+        document.body.style.cursor = 'pointer';
+      }}
+      onPointerOut={() => {
+        document.body.style.cursor = 'auto';
+      }}
+    >
       <planeGeometry args={[1.25, 3.4]} />
       <meshBasicMaterial
         map={texture}
@@ -82,6 +167,13 @@ function NpcBillboard({ textureUrl }: { textureUrl: string }) {
         side={THREE.DoubleSide}
         toneMapped={false}
       />
+      {/* 选中光环 */}
+      {selected && (
+        <mesh position={[0, -1.68, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[0.45, 0.58, 24]} />
+          <meshBasicMaterial color={theme.warm.glow} transparent opacity={0.8} toneMapped={false} />
+        </mesh>
+      )}
     </mesh>
   );
 }
@@ -169,7 +261,17 @@ const GHOSTS = [
   { pos: [0.2, -0.4, -0.6], size: [2.0, 2.2], color: theme.memory.ghost, phase: 4.2 },
 ] as const;
 
-function RainScene({ mode, npcTexture }: { mode: RainMode; npcTexture: string | null }) {
+function RainScene({
+  mode,
+  npcTexture,
+  selected,
+  onSelectResident,
+}: {
+  mode: RainMode;
+  npcTexture: string | null;
+  selected: string;
+  onSelectResident: (id: string) => void;
+}) {
   const rainRef = useRef<THREE.InstancedMesh>(null);
   const rainMat = useRef<THREE.MeshBasicMaterial>(null);
   const pointLight = useRef<THREE.PointLight>(null);
@@ -329,29 +431,55 @@ function RainScene({ mode, npcTexture }: { mode: RainMode; npcTexture: string | 
       </instancedMesh>
 
       {/* 居民立绘（billboard）：站在渡口汤碗旁，始终面向玩家 */}
-      {npcTexture && <NpcBillboard key={npcTexture} textureUrl={npcTexture} />}
+      {/* 场景居民：r1 写实立绘 + 其余剪影，点击选中（替代按钮选择） */}
+      {RESIDENT_SPOTS.filter((s) => s.id !== 'r1').map((s) => (
+        <ResidentSilhouette
+          key={s.id}
+          id={s.id}
+          pos={s.pos}
+          selected={selected === s.id}
+          onSelect={onSelectResident}
+        />
+      ))}
+      {npcTexture && (
+        <NpcBillboard
+          key={npcTexture}
+          textureUrl={npcTexture}
+          selected={selected === 'r1'}
+          onSelect={() => onSelectResident('r1')}
+        />
+      )}
     </>
   );
 }
 
 export function RainNight({
-  mode = 'idle',
+  mode,
   npcTexture = null,
+  selected = 'r1',
+  onSelectResident,
 }: {
-  mode?: RainMode;
+  mode: RainMode;
   npcTexture?: string | null;
+  selected?: string;
+  onSelectResident?: (id: string) => void;
 }) {
   return (
     <Canvas
-      // 固定全屏、置于相位 UI 之下（UI z-index:1），不拦截指针事件
-      style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none' }}
+      // 固定全屏、置于相位 UI 之下（UI z-index:1）；开启指针事件以支持"点击场景人物"
+      style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'auto' }}
       dpr={[1, 2]}
       camera={{ position: [0, 1.9, 8.5], fov: 50 }}
       gl={{ antialias: true, powerPreference: 'high-performance' }}
     >
       <color attach="background" args={[theme.rain.base]} />
       <fog attach="fog" args={[theme.rain.base, 8, 22]} />
-      <RainScene mode={mode} npcTexture={npcTexture} />
+      <RainScene
+        mode={mode}
+        npcTexture={npcTexture}
+        selected={selected}
+        onSelectResident={onSelectResident ?? (() => {})}
+      />
       <EffectComposer>
         <Bloom
           intensity={mode === 'silence' ? 0.6 : 1.0}
