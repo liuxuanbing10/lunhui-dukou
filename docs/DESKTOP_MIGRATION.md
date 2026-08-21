@@ -94,6 +94,8 @@
 
 ### Phase 3 · 内容与存档接通
 - 范围：接入全部真相表/SOUL/livingTown 叙事/记忆复仇台词；**新建本地存档**（`user://` 存轮回/记忆/strength 衰减，含版本迁移）；本地挂钩替换为真实 HTTP/WS。
+- **① 客户端↔云端接线 ✅（2026-08-21）**：ServerClient(HTTP) + Session(user://)；登录/注册(JWT) + 开局/审问/选择走 server（断网降级本地 GameLogic）；端到端冒烟 `LUNHUI_SMOKE=1` 通过（register→loop→ask f1→pause）。
+- ② 完整内容接入 / ③ 存档含版本迁移：待做。
 - **验收**：多轮回记忆跨场、存档可版本迁移、断网降级提示明确。
 
 ### Phase 4 · 打磨与分发

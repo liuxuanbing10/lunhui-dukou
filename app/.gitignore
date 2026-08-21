@@ -2,6 +2,9 @@
 .godot/
 android/
 
+# 自动安装的 Godot 开发工具插件（如 godot-mcp 连接器，本地维护即可，不入库）
+addons/
+
 # .NET 构建产物
 bin/
 obj/

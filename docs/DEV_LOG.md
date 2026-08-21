@@ -6,6 +6,27 @@
 
 ---
 
+## 2026-08-21 · 桌面化 Phase 3①：Godot 客户端接云端（登录/鉴权 + 真实回合 + 断网兜底）
+
+**本次内容**：把 app/ 客户端从"本地真相表挂钩"升级为"接 @lunhui/server 真实回合"，并加登录/注册(JWT)与本地会话存档。
+1. **ServerClient.cs**：HttpClient + System.Text.Json 封装 register/login/startLoop/ask/choice；非 2xx 抛 `ServerException{Code}`；字段 camelCase 兼容 API_CONTRACT；超时 20s。
+2. **Session.cs**：会话（baseUrl/token/playerId/username/loopId）落盘 `user://session.json`，重启续用。
+3. **Main.cs**：新增登录面板（用户名/密码/[注册并进入]/[登录]）；登录成功后接 server 开轮回、审问、选择；**断网/未登录自动降级本地 GameLogic**并明示"（本地判定·后端未连接）"；无头冒烟 `LUNHUI_SMOKE=1` 自动 E2E 后退出。
+
+**验证**：
+- `dotnet build` 0 错误；
+- 起 server（`DB_PATH=:memory:`）+ `LUNHUI_SMOKE=1` 无头运行 → `SMOKE_PASS`：register→loopId=1 seq=1 left=10→ask"你捞过我吗?"→ server 返回 `direct+pause=True+left=9`（JWT 鉴权+云端真相表全链路打通）；
+- 后端不可达(端口 7999) 无头运行 → 无异常、干净退出、进离线兜底。
+
+**坑**：
+- C# `JsonElement.ArrayEnumerator` 无 `.Select`（补 `using System.Linq;`）；`Label.MinSize` 在 Godot C# 里叫 `CustomMinimumSize`；
+- `Control` 布局用 `SetAnchorsPreset`/`Position`+`Size` 而非对象初始化器里不存在的 `AnchorsPreset` 属性；
+- 端口被占时记得清残留（见 DEVELOPMENT §7）。
+
+**下一步**：Phase 3② 完整内容接入（8 居民真相表/SOUL/记忆复仇）+ 存档版本迁移；Phase 2 演出细化（四相位/立绘/音频）。
+
+---
+
 ## 2026-08-21 · 桌面化 Phase 0：建成 Godot 桌面工程（app/）+ 垂直切片跑通
 
 **本次内容**：把项目"变成 Godot 项目"——新建 `app/` 桌面客户端（C#/mono），跑通单居民 r1 垂直闭环。
