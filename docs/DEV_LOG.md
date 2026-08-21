@@ -6,6 +6,24 @@
 
 ---
 
+## 2026-08-21 · 桌面化 Phase 4：Windows 包导出成功（LunhuiDukou.exe ~116MB）
+
+**本次内容**：在用户扩容/重启释放内存后，把 Godot 桌面端导出为 Windows 自包含包。
+1. **模板归属**：编辑器按 `%APPDATA%\Godot\export_templates\4.8.dev3.mono\`（带 `.mono` 后缀）找模板；把 `D:\tools\Godot_export_templates\4.8-dev3\templates\*` 拷入该目录。
+2. **导出**：预设 `export_presets.cfg`（`exclude_filter="addons/*"` 不打包开发插件）→ `godot --headless --path app --export-release "Windows 桌面" build/LunhuiDukou.exe` 成功。
+3. **产物**：`build/LunhuiDukou.exe`(~116MB) + `data_LunhuiDukou_windows_x86_64/`（.NET 运行时目录）共同构成分发单元。
+
+**验证**：`dotnet publish`（导出内嵌）成功；无头导出 exit 0；内存恢复后 E2E `SMOKE_PASS` 复验通过。
+
+**坑**：
+- 之前 `0x800705AF`（虚拟内存/页面文件不足）把 `dotnet publish` 拒绝——**扩容或重启后即通**，勿低资源硬重试；
+- 编辑器找模板的版本目录是 `4.8.dev3.mono`（点分 + `.mono` 后缀），不是 `4.8-dev3`（连字符）；
+- 第一次报"导出路径不存在"——`build/` 目录要先创建。
+
+**下一步**：把完整分发包（exe + data_）交给主创 GUI 试玩验收（G1）；签名/杀毒应对（可选）。
+
+---
+
 ## 2026-08-21 · 桌面化 全量演出+真模型：8 位居民建模接入 / 镜头 / 节奏 / 混音 / 导出预设
 
 **本次内容**：

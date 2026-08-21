@@ -100,8 +100,10 @@
 ### Phase 4 · 打磨与分发
 - 范围：视觉 polish、导出 Windows 包、签名/杀毒应对（可选）、更新（整包发布起步，热更后议）。
 - **明确 MVP 边界**：不做云存档/排行榜/多人协作。
-- **状态**：导出预设 `app/export_presets.cfg` 与导出模板均已就绪；本机 Qt 导出因**系统虚拟内存不足（页面文件过小 `0x800705AF`，dotnet publish 自包含运行时触发）**阻塞。环境/CI 就绪后执行：
+- **✅ Windows 包导出成功（2026-08-21）**：`build/LunhuiDukou.exe`（~116MB 自包含）+ `data_...`（.NET 运行时目录）即分发单元。命令：
   `godot --headless --path app --export-release "Windows 桌面" build/LunhuiDukou.exe`
+  （预设 `app/export_presets.cfg`，`exclude_filter="addons/*"` 不打包开发插件）
+- **导出注意**：模板需放在编辑器要求的版本目录 `%APPDATA%\Godot\export_templates\4.8.dev3.mono\`（带 `.mono` 后缀）；导出前需创建 `build/`；此前因系统虚拟内存不足（页面文件过小）受阻，扩容/重启后成功。
 
 ---
 

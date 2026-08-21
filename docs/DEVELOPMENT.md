@@ -113,3 +113,20 @@ npm run lint && npm run typecheck && npm run test && npm run build
   ```
 - 产出 `app/assets/models/resident_r1.glb`；脚本是唯一真源（不维护 `.blend`），保证可复现。
 - 新增模型后记得在 Godot 里重导入（§9 的 `--import`）。
+
+## 11. 导出 Windows 包（Phase 4，已验证成功）
+
+> 模板要放在编辑器要求的版本目录（带 `.mono` 后缀）：`%APPDATA%\Godot\export_templates\4.8.dev3.mono\`
+> （把 `D:\tools\Godot_export_templates\4.8-dev3\templates\*` 拷进去即可）。
+
+```bash
+# 若 build/ 不存在先创建
+mkdir app/build
+
+# 无头导出释放版
+godot --headless --path app --export-release "Windows 桌面" build/LunhuiDukou.exe
+```
+
+- 产物：`build/LunhuiDukou.exe` + 同目录 `data_LunhuiDukou_windows_x86_64/`（.NET 运行时）——两者一起才是可分发的完整包。
+- 预设 `app/export_presets.cfg` 设了 `exclude_filter="addons/*"`，不打包开发用 godot-mcp 插件。
+- 踩坑：C# 自包含导出需足够虚拟内存（曾 `0x800705AF`），内存紧张时先重启/扩容再导出。
