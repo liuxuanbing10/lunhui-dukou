@@ -18,11 +18,11 @@ public partial class AmbientAudio : Node
 
     private const float RainBase = 0.16f;
     private const double RainSilenceDb = -34f; // 沉默段雨声近乎静默
-    private const double RainNormalDb = -16f;
+    private const double RainNormalDb = -14f;
 
     private const float WarmBase = 0.045f;
     private const double WarmSilenceDb = -38f;
-    private const double WarmNormalDb = -26f;
+    private const double WarmNormalDb = -24f;
 
     private AudioStreamPlayer? _rain;
     private AudioStreamPlayer? _warm;
@@ -81,7 +81,7 @@ public partial class AmbientAudio : Node
         if (!_started && _rain == null) return;
         try
         {
-            var player = new AudioStreamPlayer { Stream = wav, VolumeDb = -14f };
+            var player = new AudioStreamPlayer { Stream = wav, VolumeDb = -12f };
             AddChild(player);
             player.Play();
             player.Finished += () => player.QueueFree();

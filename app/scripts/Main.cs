@@ -64,6 +64,23 @@ public partial class Main : Node3D
     private Control? _memoryPanel;
     private Label? _memoryLines;
 
+    private Camera3D _camera = null!;
+    private Vector3 _baseCam = new(0, 6, 14);
+    private float _baseFov = 60f;
+    private float _time;
+
+    public override void _Process(double delta)
+    {
+        if (_camera == null) return;
+        _time += (float)delta;
+        // 缓摆仰视（旷街阿飞感的小运镜）
+        var sway = new Vector3(Mathf.Sin(_time * 0.18f) * 0.25f, Mathf.Sin(_time * 0.45f) * 0.06f, 0);
+        var desired = _baseCam + sway;
+        _camera.Position = _camera.Position.Lerp(desired, (float)delta * 3f);
+        _camera.Fov = Mathf.Lerp(_camera.Fov, _baseFov, (float)delta * 3f);
+        _camera.LookAt(new Vector3(0, 1.5f, 0), Vector3.Up);
+    }
+
     public override void _Ready()
     {
         _server = new ServerClient(OS.GetEnvironment("LUNHUI_SERVER") ?? DefaultBaseUrl);
@@ -153,11 +170,11 @@ public partial class Main : Node3D
         };
         AddChild(_moodLight);
 
-        var camera = new Camera3D { Fov = 60 };
-        AddChild(camera);
-        camera.LookAtFromPosition(new Vector3(0, 6, 14), new Vector3(0, 0, 0), Vector3.Up);
+        _camera = new Camera3D { Fov = 60 };
+        AddChild(_camera);
+        _camera.LookAtFromPosition(new Vector3(0, 6, 14), new Vector3(0, 0, 0), Vector3.Up);
 
-        // 8 位居民：r1 用 Blender 真模型（resident_r1.glb），其余占位胶囊（真模型后续逐个替换）
+        // 8 位居民：各自 Blender 真模型（resident_r{id}.glb），失败回退胶囊
         for (int i = 0; i < GameLogic.All.Length; i++)
         {
             float childScale = GameLogic.All[i].Id == "r8" ? 0.62f : 1f;
@@ -166,7 +183,7 @@ public partial class Main : Node3D
                 Position = new Vector3((i - 3.5f) * 1.7f, 0, 2.6f + (i % 2) * 0.4f),
                 Scale = new Vector3(childScale, childScale, childScale),
             };
-            var body = GameLogic.All[i].Id == "r1" ? _TryLoadResidentModel() : null;
+            var body = _TryLoadResidentModel(GameLogic.All[i].Id);
             if (body == null) body = _CapsuleBody();
             node.AddChild(body);
             AddChild(node);
@@ -175,17 +192,17 @@ public partial class Main : Node3D
         _TryAddRain();
     }
 
-    // 载入 Blender 真模型（Phase 2 收尾；加载失败回退胶囊）
-    private Node3D? _TryLoadResidentModel()
+    // 载入 Blender 真模型（resident_r{id}.glb；加载失败回退胶囊）
+    private Node3D? _TryLoadResidentModel(string id)
     {
         try
         {
-            var scene = GD.Load<PackedScene>("res://assets/models/resident_r1.glb");
+            var scene = GD.Load<PackedScene>($"res://assets/models/resident_{id}.glb");
             return scene.Instantiate<Node3D>();
         }
         catch (System.Exception e)
         {
-            GD.PushWarning($"[main] 真模型加载失败（回退胶囊）: {e.Message}");
+            GD.PushWarning($"[main] 真模型{id}加载失败（回退胶囊）: {e.Message}");
             return null;
         }
     }
@@ -668,7 +685,11 @@ public partial class Main : Node3D
         {
             await TypewriterAsync(res.Text);
             if (_left <= 0) _EnterPhase(Phase.Choice);
-            else EnableAsk(); // 继续审问
+            else
+            {
+                await WaitSeconds(0.5); // 一记"节拍"再恢复提问，避免赶场
+                EnableAsk();
+            }
         }
         _transitioning = false;
     }
@@ -752,6 +773,15 @@ public partial class Main : Node3D
         _silenceDim!.Visible = false;
         if (p == Phase.Memory) _narrator!.Visible = false;
         else _narrator!.Visible = true;
+
+        // 相位机位/焦距（_Process 缓动逼近）
+        (_baseCam, _baseFov) = p switch
+        {
+            Phase.Choice => (new Vector3(0, 6, 13), 60f),
+            Phase.Death => (new Vector3(0, 3.5f, 6), 64f),   // 死亡贴脸收拢
+            Phase.Memory => (new Vector3(0, 5, 10), 56f),    // 记忆稍远景
+            _ => (new Vector3(0, 6, 14), 60f),               // Intro
+        };
     }
 
     private void EnableAsk()

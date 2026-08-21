@@ -9,3 +9,7 @@ addons/
 bin/
 obj/
 *.user
+
+# 导出产物
+build/
+export_presets.cfg.uid
