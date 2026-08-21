@@ -50,6 +50,7 @@ public partial class Main : Node3D
 
     private Label? _header;
     private Label? _narrator;
+    private TextureRect? _portrait;
     private OptionButton? _residentSel;
     private LineEdit? _input;
     private Button? _askBtn;
@@ -156,7 +157,7 @@ public partial class Main : Node3D
         AddChild(camera);
         camera.LookAtFromPosition(new Vector3(0, 6, 14), new Vector3(0, 0, 0), Vector3.Up);
 
-        // 8 位居民占位立绘（真模型在后续 Blender 阶段接入）
+        // 8 位居民：r1 用 Blender 真模型（resident_r1.glb），其余占位胶囊（真模型后续逐个替换）
         for (int i = 0; i < GameLogic.All.Length; i++)
         {
             float childScale = GameLogic.All[i].Id == "r8" ? 0.62f : 1f;
@@ -165,32 +166,57 @@ public partial class Main : Node3D
                 Position = new Vector3((i - 3.5f) * 1.7f, 0, 2.6f + (i % 2) * 0.4f),
                 Scale = new Vector3(childScale, childScale, childScale),
             };
-            var body = new MeshInstance3D
-            {
-                Mesh = new CapsuleMesh { Radius = 0.32f, Height = 1.6f },
-                Position = new Vector3(0, 0.8f, 0),
-            };
-            body.MaterialOverride = new StandardMaterial3D
-            {
-                AlbedoColor = Color.FromHtml(new[] { "#2E4A3F", "#9A6B4F", "#D8B46A", "#6E4B3A", "#5C6B73", "#6E5A3E", "#4A5A6B", "#7A8B6E" }[i]!),
-                Roughness = 0.9f,
-            };
+            var body = GameLogic.All[i].Id == "r1" ? _TryLoadResidentModel() : null;
+            if (body == null) body = _CapsuleBody();
             node.AddChild(body);
-            var hat = new MeshInstance3D
-            {
-                Mesh = new CylinderMesh { TopRadius = 0.4f, BottomRadius = 0.4f, Height = 0.12f },
-                Position = new Vector3(0, 1.62f, 0),
-            };
-            hat.MaterialOverride = new StandardMaterial3D
-            {
-                AlbedoColor = new Color(0.13f, 0.2f, 0.17f),
-                Roughness = 0.95f,
-            };
-            node.AddChild(hat);
             AddChild(node);
         }
 
         _TryAddRain();
+    }
+
+    // 载入 Blender 真模型（Phase 2 收尾；加载失败回退胶囊）
+    private Node3D? _TryLoadResidentModel()
+    {
+        try
+        {
+            var scene = GD.Load<PackedScene>("res://assets/models/resident_r1.glb");
+            return scene.Instantiate<Node3D>();
+        }
+        catch (System.Exception e)
+        {
+            GD.PushWarning($"[main] 真模型加载失败（回退胶囊）: {e.Message}");
+            return null;
+        }
+    }
+
+    // 占位胶囊（含斗笠）——无真模型时的兜底立绘
+    private Node3D _CapsuleBody()
+    {
+        var root = new Node3D();
+        var body = new MeshInstance3D
+        {
+            Mesh = new CapsuleMesh { Radius = 0.32f, Height = 1.6f },
+            Position = new Vector3(0, 0.8f, 0),
+        };
+        body.MaterialOverride = new StandardMaterial3D
+        {
+            AlbedoColor = Color.FromHtml("#4A5A6B"),
+            Roughness = 0.9f,
+        };
+        root.AddChild(body);
+        var hat = new MeshInstance3D
+        {
+            Mesh = new CylinderMesh { TopRadius = 0.4f, BottomRadius = 0.4f, Height = 0.12f },
+            Position = new Vector3(0, 1.62f, 0),
+        };
+        hat.MaterialOverride = new StandardMaterial3D
+        {
+            AlbedoColor = new Color(0.13f, 0.2f, 0.17f),
+            Roughness = 0.95f,
+        };
+        root.AddChild(hat);
+        return root;
     }
 
     private void _TryAddRain()
@@ -306,7 +332,20 @@ public partial class Main : Node3D
             AutowrapMode = TextServer.AutowrapMode.WordSmart,
         };
         _narrator.AddThemeColorOverride("font_color", ThemeTokens.InkPrimary);
-        outer.AddChild(_narrator);
+
+        // 立绘（当前居民 2D 图，Web 资产同源）｜ 文字区
+        var narRow = new HBoxContainer { Name = "NarRow" };
+        _portrait = new TextureRect
+        {
+            Name = "Portrait",
+            CustomMinimumSize = new Vector2(150, 210),
+            StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
+            ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+        };
+        _portrait.CustomMinimumSize = new Vector2(150, 210);
+        narRow.AddChild(_portrait);
+        narRow.AddChild(_narrator);
+        outer.AddChild(narRow);
 
         var selRow = new HBoxContainer { Name = "SelRow" };
         var selLabel = new Label { Text = "向谁问：" };
@@ -315,7 +354,11 @@ public partial class Main : Node3D
         _residentSel = new OptionButton { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
         for (int i = 0; i < GameLogic.All.Length; i++)
             _residentSel.AddItem(GameLogic.All[i].Name);
-        _residentSel.ItemSelected += idx => _residentId = GameLogic.All[(int)idx].Id;
+        _residentSel.ItemSelected += idx =>
+        {
+            _residentId = GameLogic.All[(int)idx].Id;
+            _UpdatePortrait();
+        };
         selRow.AddChild(_residentSel);
         outer.AddChild(selRow);
 
@@ -568,6 +611,7 @@ public partial class Main : Node3D
     {
         RefreshHeader();
         _EnterPhase(Phase.Intro);
+        _UpdatePortrait();
         await TypewriterAsync(intro);
         EnableAsk();
     }
@@ -634,6 +678,7 @@ public partial class Main : Node3D
     {
         _audio?.SetSilence(true);
         _audio?.PlayReveal();
+        if (_residentId == "r1") _UpdatePortrait("face_hit"); // 蓑衣人命中 → 表情帧
         _moodLight?.CreateTween().TweenProperty(_moodLight, "light_energy", 0.18f, 0.5f);
         _silenceDim!.Color = new Color(0, 0, 0, 0);
         _silenceDim.CreateTween().TweenProperty(_silenceDim, "color", new Color(0, 0, 0, 0.55f), 0.5f);
@@ -643,6 +688,7 @@ public partial class Main : Node3D
         await WaitSeconds(SilenceMs / 1000.0 * 0.6);
 
         _audio?.SetSilence(false);
+        _UpdatePortrait(); // 恢复立绘默认帧
         _moodLight?.CreateTween().TweenProperty(_moodLight, "light_energy", 0.6f, 0.6f);
         _silenceDim.CreateTween().TweenProperty(_silenceDim, "color", new Color(0, 0, 0, 0), 0.5f);
         _silenceDim.Visible = false;
@@ -713,6 +759,23 @@ public partial class Main : Node3D
         _input!.Editable = true;
         _askBtn!.Disabled = false;
         _input.GrabFocus();
+    }
+
+    // 对话立绘：默认 body.webp；face 传 e.g. "face_hit"（仅 r1 有表情帧）
+    private void _UpdatePortrait(string? face = null)
+    {
+        if (_portrait == null) return;
+        var file = face != null
+            ? $"res://assets/portraits/{_residentId}/{face}.webp"
+            : $"res://assets/portraits/{_residentId}/body.webp";
+        try
+        {
+            _portrait.Texture = GD.Load<Texture2D>(file);
+        }
+        catch (System.Exception e)
+        {
+            GD.PushWarning($"[main] 立绘加载失败: {e.Message}");
+        }
     }
 
     private void NarrateFull(string text) => _narrator!.Text = text;

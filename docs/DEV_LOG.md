@@ -6,6 +6,28 @@
 
 ---
 
+## 2026-08-21 · 桌面化 Phase 2 收尾：接入 Blender 真模型 + 立绘
+
+**本次内容**：把 r1 从胶囊占位换成 Blender 真模型，并接入居民立绘到对话区。
+1. **Blender 真模型**：`app/scripts/blender/resident_suoyi.py`（低多边形蓑衣人：锥形蓑衣 bmesh 圆柱体 + 斗笠锥 + 头球 + 袖柱，单 PBR 材质）→ `--background --python` 导出 `resident_r1.glb`（94KB）；**Blender→Godot 管线打通**（R4：只留 glb 进游戏）。
+2. **Godot 接入**：`_BuildWorld` 中 r1 用 `GD.Load<PackedScene>(resident_r1.glb)` 载入真模型，失败回退胶囊；其余 7 人仍胶囊占位。
+3. **对话立绘**：移植 8 居民 body.webp 到 `app/assets/portraits/`；对话区左上 `TextureRect` 显示当前居民立绘，r1 命中真相切换到 `face_hit` 表情帧再恢复。
+
+**验证**：
+- `dotnet build` 0 错误；
+- `godot --import` 导入 resident_r1.glb 无 ERROR；
+- 无头运行载入模型/立绘无报错；
+- 起 server + `LUNHUI_SMOKE=1` → `SMOKE_PASS`（无回归）。
+
+**坑**：
+- Blender 5.2 的 gltf 导出不接受 `export_y_up/export_apply`（官方默认即 y_up+apply），传了会被拒并 Traceback；
+- `TextureRect` 的 `SetAnchorsAndOffsetsPreset(CenterLeft)` 在 HBox 内会干扰布局→只用 `CustomMinimumSize` 控尺寸；
+- `_residentSel.ItemSelected` 需在 OptionButton 构造后再接线（早引会导致空引用）。
+
+**下一步**：其余 7 位居民真模型（按各自立绘配色）、镜头运镜、音频混音；G1 决策门待 GUI 实测。
+
+---
+
 ## 2026-08-21 · 桌面化 Phase 2：Godot 演出层移植（波形机/相位/沉默留白/主题/音频）
 
 **本次内容**：把 web 演出层语义落到 Godot 节点（对齐 web/src/App.tsx + useTypewriter + theme.ts + audio.ts）。

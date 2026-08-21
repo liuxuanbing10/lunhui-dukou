@@ -102,3 +102,14 @@ npm run lint && npm run typecheck && npm run test && npm run build
   Godot_v4.8-dev3_mono_win64.exe --headless --path app --quit-after 90
   ```
 - **提交注意**：`app/.godot`、`app/bin`、`app/obj` 已被 `app/.gitignore` 排除，不入库；`*.import` 元数据需入库。
+
+## 10. Blender 真模型产出（`app/scripts/blender/`，可复现）
+
+> Blender 5.2 LTS 在 `D:\tools\blender\blender-5.2.0-windows-x64\blender.exe`（**注意路径比 DESKTOP_MIGRATION 记录的深一层**）。
+
+- **重新生成居民模型**（改脚本后重跑会覆盖 glb）：
+  ```bash
+  D:\tools\blender\blender-5.2.0-windows-x64\blender.exe --background --python app/scripts/blender/resident_suoyi.py
+  ```
+- 产出 `app/assets/models/resident_r1.glb`；脚本是唯一真源（不维护 `.blend`），保证可复现。
+- 新增模型后记得在 Godot 里重导入（§9 的 `--import`）。

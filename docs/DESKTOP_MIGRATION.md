@@ -86,7 +86,8 @@
 ### Phase 2 · Godot 演出层移植（核心工作量）<!-- ✅ 核心语义已落地，见 DEV_LOG 2026-08-21 -->
 - 范围：把 Web 演出层**语义**落到 Godot 节点/场景。
 - **已落地**：相位状态机 boot→intro→choice→death→memory（对齐 web/src/App.tsx）；打字机对话（intro/memory 逐字，35ms/字）；「沉默三秒」视听留白（命中关键→暖光收束 dim + 雨声/暖压暗 + 钟鸣泛音）；死亡相位（全屏暗调+后果+死因+进入下一轮）；记忆相位（跨世记忆叠影+继续）；主题 token（ThemeTokens 对齐 art-style-2.5d 上色到 UI）；程序化音频 AmbientAudio（雨声床/暖 pad/钟鸣/否决/往生/笛音，生成 PCM→AudioStreamWav，无外部文件）。
-- **待做**：真模型/立绘接入、镜头运镜细化、审问节奏微调、音频 bus 混音打磨。
+- **待做**：其余 7 位居民真模型（当前胶囊占位）、镜头运镜细化、审问节奏微调、音频 bus 混音打磨。
+- **接入真模型与立绘 ✅（2026-08-21）**：Blender 无头脚本(`app/scripts/blender/resident_suoyi.py`)建模蓑衣人(r1)并导出 `resident_r1.glb`（94KB，Blender→Godot 管线打通）；对话区立绘用 8 居民 body.webp（Web 资产同源），r1 命中真相切换 face_hit 表情帧。
 - **验收**：8 居民立绘/场景切换、审问节奏、"沉默三秒"完整演出、死亡/记忆相位可跑。
 
 ### Phase 3 · 内容与存档接通
