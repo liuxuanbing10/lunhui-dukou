@@ -6,6 +6,20 @@
 
 ---
 
+## 2026-08-21 · godot-mcp 编辑器深控受限 —— R1 风险实锤（4.8-dev3 不注册 EditorInterface 单例）
+
+**现象**：即便只保留一个干净 GUI 编辑器（`godot --editor --path app`，插件加载、MCP server 起在 3000、注册 74 工具），`scene_management`/`editor_status`/`scene_hierarchy` 等编辑器级工具仍统一返回 `Editor interface not available`；仅 `project_info`/`get_features` 等非编辑器级可用。
+
+**根因**：本 `godot-mcp` v1.0.0 经 `Engine.get_singleton("EditorInterface")` 取编辑器接口，**Godot 4.8-dev3 未注册 `EditorInterface` 单例**（addon↔dev 版不兼容；曾尝试干净单实例仍复现，排除多进程/端口之争）。
+
+**影响/决策**：
+- 这正印证 DESKTOP_MIGRATION 的 **R1 风险（Godot dev 版稳定性）**，是 G1 决策门的有力证据——若团队重度依赖 godot-mcp 编辑器自动化，建议评估降级到 **Godot 4.x 稳定版**（插件 Docs 目标环境）或留到主创选型时定。
+- 编辑器 GUI 本身可用（窗口正常、项目级 MCP 可用、CLI build/import/smoke/export 全通）；仅**编辑器节点/场景自动化**走不通。
+
+**待办**：降级到稳定 Godot 时验证 godot-mcp；或将 addon `base_tools.gd::_get_editor_interface()` 适配 4.8 单例命名。
+
+---
+
 ## 2026-08-21 · 签名与杀毒应对 + godot-mcp 接通检查
 
 **本次内容**：
