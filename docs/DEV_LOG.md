@@ -6,6 +6,27 @@
 
 ---
 
+## 2026-08-21 · 桌面化 Phase 1：server 云端化改造（账号/隔离/限流/WebSocket）
+
+**本次内容**：按 DESKTOP_MIGRATION.md Phase 1，把 server 从"单机无鉴权"升级为"可服务多玩家桌面的云端后端"——四件套全做完。
+1. **账号/鉴权**：新增 `players` 表 + `@fastify/jwt`（JWT 登录）。密码用 node:crypto `scrypt` + 随机盐 + `timingSafeEqual`（零新原生依赖）。`GET/POST /api/auth/register`、`/api/auth/login`；除 `health/auth/*/events/stream` 外全部受保护，无 token → `401 UNAUTHORIZED`。
+2. **玩家维度隔离**：`loops/memories/events/questions/world_states` 五表加 `player_id`；`repository` 全部读写携带 `playerId`，`getLoop` 按 `(player_id,id)` 校验——B 玩家查/操作 A 的 loop 与记忆天然得空/undefined。旧 dev 库用 `ALTER TABLE ADD COLUMN player_id` 自动迁移。
+3. **限流**：内存滑动窗口（`services/rate-limiter.ts`），`/api/ask` 按玩家（默认 20/min）、login 按 IP（5/min）、LLM 调用按玩家（30/min），超限 → `429 RATE_LIMITED`。
+4. **事件流 SSE → WebSocket**：`services/broker.ts`（进程内按 player_id 发布订阅）+ `packages/server` 的 `GET /api/events/stream?token=`（手内验签），轮回开场事件实时推送。
+
+**关键决策**：方向确认 D.A.（Web→桌面），桌面客户端为唯一面向客户端；`web` 包保留不动（待 Godot 演出层承接后废弃，属 Phase 2 范围）。
+
+**验收证据**：52 个 server 测试全绿（含"双玩家额度/记忆隔离"核心用例）；全仓 90 测试通过；四件套（lint/typecheck/test/build）0 错误；实机冒烟——`register→loop→ask命中f1(pause)→无token返回401` 逐项符合 API_CONTRACT。
+
+**坑**：
+- `@fastify/websocket` 注册后非 WS 路由 `config` 需满足新重载 → 用 `interface FastifyContextConfig { public?: boolean }` 增强解决；
+- loop-service 原 `db = getDb()` 默认参数随签名变更删除，需清理未用导入；
+- 双玩家隔离用例一度断言 B 记忆为 0，但 B 自己提问命中 f1 会写记忆——正确校验应是"B 提问前看不到 A 的记忆"。
+
+**下一步**：Phase 0 垂直切片（Godot + dukou.glb 单居民闭环）；server 会话化/云部署预研。
+
+---
+
 ## 2026-08-11 · 全盘审视修复：死代码清理 + 人物动画 + 植被 + 性能
 
 **本次内容**（审视报告 → 4 项修复）：

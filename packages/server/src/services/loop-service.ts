@@ -26,9 +26,9 @@ import {
   getStrongMemories,
   saveWorldState,
 } from '../db/repository.js';
-import { getDb } from '../db/index.js';
 import type { EventRow } from '../db/types.js';
 import { rowToResident } from '../utils/row-to-resident.js';
+import { publishEvent } from './broker.js';
 
 export const MAX_QUESTIONS = 10;
 
@@ -72,6 +72,7 @@ async function conservativeFallback(
   question: string,
   resident: Parameters<typeof judgeAsk>[1],
   db: Database,
+  playerId: number,
 ): Promise<{ text: string; usedLlm: boolean }> {
   // 引导问题：谁是第 9 个 / 多出来的是谁 / 船上的人（剧情设计，不走 LLM）
   const guidePattern = /第9个|第九个|多出来|多了一个|船上|9个|九个人|人数/;
@@ -89,29 +90,33 @@ async function conservativeFallback(
   }
 
   // 其他问题 → LLM 生成（sophnet 主 → deepseek 备 → 保守兜底）
-  const result = await generateAnswer(resident, question, db);
+  const result = await generateAnswer(resident, question, db, playerId);
   return { text: result.text, usedLlm: result.provider !== 'none' };
 }
 
 /** 开始新轮回 */
-export function startNewLoop(db: Database = getDb()): NewLoopOutcome {
-  const latest = getLatestLoop(db);
+export function startNewLoop(db: Database, playerId: number): NewLoopOutcome {
+  const latest = getLatestLoop(db, playerId);
   const sequence = latest ? latest.sequence + 1 : 1;
 
-  // 轮回重置：非永久记忆衰减
-  if (sequence > 1) decayMemories(db);
+  // 轮回重置：非永久记忆衰减（仅本玩家）
+  if (sequence > 1) decayMemories(db, playerId);
 
-  const loopId = createLoop(db, sequence);
+  const loopId = createLoop(db, playerId, sequence);
   const residents = getAllResidents(db);
   const activeResidents = residents.map((r) => r.id);
 
-  // 开场事件
-  addEvent(db, loopId, 'plot', INTRO, false, false);
+  // 开场事件 + 实时推送（WebSocket 流）
+  addEvent(db, playerId, loopId, 'plot', INTRO, false, false);
   for (const r of residents.slice(0, 3)) {
-    addEvent(db, loopId, 'ambient', `${r.name}在镇上。`, false, false);
+    addEvent(db, playerId, loopId, 'ambient', `${r.name}在镇上。`, false, false);
   }
 
-  saveWorldState(db, loopId, [], { started: true }, activeResidents);
+  saveWorldState(db, playerId, loopId, [], { started: true }, activeResidents);
+
+  const events = getEvents(db, loopId);
+  // 事件已落库，再经 broker 实时推给该玩家的 WebSocket 订阅
+  for (const ev of events) publishEvent(playerId, ev);
 
   return {
     loopId,
@@ -119,18 +124,19 @@ export function startNewLoop(db: Database = getDb()): NewLoopOutcome {
     intro: INTRO,
     questionsLeft: MAX_QUESTIONS,
     activeResidents,
-    events: getEvents(db, loopId),
+    events,
   };
 }
 
-/** 审问（额度 + 真相表判定 + fallback） */
+/** 审问（额度 + 真相表判定 + fallback）。loopId 按 playerId 归属校验，天然防跨玩家越权。 */
 export async function askQuestion(
+  db: Database,
+  playerId: number,
   loopId: number,
   residentId: string,
   question: string,
-  db: Database = getDb(),
 ): Promise<AskOutcome> {
-  const loop = getLoop(db, loopId);
+  const loop = getLoop(db, playerId, loopId);
   if (!loop) {
     throw new AppError('LOOP_NOT_FOUND');
   }
@@ -138,8 +144,8 @@ export async function askQuestion(
     throw new AppError('LOOP_ENDED');
   }
 
-  // 额度强制（server 层）
-  const asked = countQuestionsInLoop(db, loopId);
+  // 额度强制（server 层，按玩家统计）
+  const asked = countQuestionsInLoop(db, playerId, loopId);
   if (asked >= MAX_QUESTIONS) {
     throw new AppError('NO_QUESTIONS_LEFT');
   }
@@ -151,10 +157,13 @@ export async function askQuestion(
   const resident = rowToResident(row);
 
   // 真相表判定（纯规则优先，不烧 LLM）；未命中 → LLM 血肉层
-  const result = await judgeAsk(question, resident, (q, r) => conservativeFallback(q, r, db));
+  const result = await judgeAsk(question, resident, (q, r) =>
+    conservativeFallback(q, r, db, playerId),
+  );
 
   addQuestion(
     db,
+    playerId,
     loopId,
     residentId,
     question,
@@ -168,11 +177,11 @@ export async function askQuestion(
   if (result.hitFactId) {
     const fact = resident.secretFacts.facts.find((f) => f.id === result.hitFactId);
     if (fact) {
-      addMemory(db, residentId, loopId, `${resident.name}提到：${fact.statement}`, false);
+      addMemory(db, playerId, residentId, loopId, `${resident.name}提到：${fact.statement}`, false);
     }
   }
 
-  const left = MAX_QUESTIONS - countQuestionsInLoop(db, loopId);
+  const left = MAX_QUESTIONS - countQuestionsInLoop(db, playerId, loopId);
   return {
     loopId,
     sequence: loop.sequence,
@@ -189,11 +198,12 @@ export async function askQuestion(
 
 /** 关键选择（结束轮回） */
 export function makeChoice(
+  db: Database,
+  playerId: number,
   loopId: number,
   choice: string,
-  db: Database = getDb(),
 ): ChoiceOutcome {
-  const loop = getLoop(db, loopId);
+  const loop = getLoop(db, playerId, loopId);
   if (!loop) {
     throw new AppError('LOOP_NOT_FOUND');
   }
@@ -204,18 +214,18 @@ export function makeChoice(
   };
   const consequence = consequences[choice] ?? '（你做了选择。天亮时，轮回重置了。）';
 
-  endLoop(db, loopId, choice, consequence);
+  endLoop(db, playerId, loopId, choice, consequence);
 
   return { accepted: true, consequence, loopStatus: 'ended' };
 }
 
-/** 玩家记忆查询（数据访问收编进 repository.getStrongMemories） */
-export function playerMemory(db: Database = getDb()): Array<{
+/** 玩家记忆查询（仅本玩家，数据访问收编进 repository.getStrongMemories） */
+export function playerMemory(db: Database, playerId: number): Array<{
   content: string;
   strength: number;
   loop_id: number | null;
 }> {
-  return getStrongMemories(db);
+  return getStrongMemories(db, playerId);
 }
 
 export { getEvents };

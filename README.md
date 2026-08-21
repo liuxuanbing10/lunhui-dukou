@@ -16,12 +16,11 @@
 
 ```
 lunhui-dukou/
-├── docs/                # 项目宪法（五份权威文档）
+├── docs/                # 项目宪法（权威文档+DESKTOP_MIGRATION+FUTURE_VISION）
 ├── packages/
 │   ├── engine/          # AI 生成引擎（真相表/记忆/关系网/事件）
-│   ├── server/          # Fastify API（审问/轮回/记忆）
-│   └── web/             # React 演出层（五件套）
-├── CONTRIBUTING.md      # 贡献指南
+│   ├── server/          # Fastify API（云端：审问/轮回/记忆/账号隔离）
+│   └── client/          # Godot 桌面客户端（表演层，替代原 web）
 └── README.md
 ```
 
@@ -29,6 +28,8 @@ lunhui-dukou/
 
 | 文档 | 内容 | 何时更新 |
 |---|---|---|
+| [docs/DESKTOP_MIGRATION.md](docs/DESKTOP_MIGRATION.md) | **桌面化迁移规划（Web→Godot 客户端 + 云端 AI 后端）** | 改技术迁移/工具链时 |
+| [docs/FUTURE_VISION.md](docs/FUTURE_VISION.md) | **未来战略（定位/竞争/破圈/商业/里程碑）** | 改战略/市场判断时 |
 | [docs/DEV_LOG.md](docs/DEV_LOG.md) | **项目日志（每次开发历程，最新在前）** | 每次开发后追加 |
 | [docs/GAMEPLAY_GUIDE.md](docs/GAMEPLAY_GUIDE.md) | **玩法说明（怎么玩，从零讲起）** | 改玩法时 |
 | [docs/SPEC.md](docs/SPEC.md) | 产品全案：世界观/玩法/变现/合规/路线图 | 改产品行为时 |
@@ -45,15 +46,18 @@ lunhui-dukou/
 
 ## 🛠️ 技术栈
 
-TypeScript · React 19 · Fastify 5 · SQLite · LLM 多 provider 容灾 · ECS + PM2
+- **客户端**：Godot 4（C#）+ Blender 4 资产（Windows 桌面游戏）
+- **后端**：TypeScript · Fastify 5 · SQLite
+- **核心能力**：真相表判定（engine）· 记忆/关系网 · LLM 多 provider 容灾
+- **联网**：HTTP + WebSocket（事件流）· JWT 鉴权 · 按玩家额度/记忆隔离
 
 ## 🚀 快速开始
 
 ```bash
 npm install
 cp .env.example .env   # 填入 LLM API Key
-npm run dev:server     # http://127.0.0.1:8787
-npm run dev:web        # http://127.0.0.1:5173
+npm run dev:server     # 云端后端 http://127.0.0.1:8787
+# 客户端：用 D:\tools\Godot_v4.8-dev3_mono_win64 打开 app/ 目录直接运行
 ```
 
 完整步骤见 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)。

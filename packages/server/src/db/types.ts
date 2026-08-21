@@ -18,8 +18,16 @@ export interface ResidentRow {
   is_active: number;
 }
 
+export interface PlayerRow {
+  id: number;
+  username: string;
+  password_hash: string;
+  created_at: string;
+}
+
 export interface LoopRow {
   id: number;
+  player_id: number;
   sequence: number;
   player_choice: string | null;
   death_cause: string | null;
@@ -30,6 +38,7 @@ export interface LoopRow {
 
 export interface MemoryRow {
   id: number;
+  player_id: number;
   resident_id: string;
   loop_id: number | null;
   content: string;
@@ -39,6 +48,7 @@ export interface MemoryRow {
 
 export interface EventRow {
   id: number;
+  player_id: number;
   loop_id: number | null;
   type: string;
   content: string;
@@ -48,6 +58,7 @@ export interface EventRow {
 
 export interface QuestionRow {
   id: number;
+  player_id: number;
   loop_id: number;
   resident_id: string;
   question: string;
@@ -59,6 +70,7 @@ export interface QuestionRow {
 
 export interface WorldStateRow {
   id: number;
+  player_id: number;
   loop_id: number | null;
   relations_snapshot: string;
   flags: string;

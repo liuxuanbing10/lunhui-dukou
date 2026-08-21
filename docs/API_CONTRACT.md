@@ -4,6 +4,26 @@
 > 错误统一形状：`{ "error": { "code": string, "message": string } }`
 > **命名约定：响应字段一律 camelCase；请求体保留历史 snake_case（`loop_id`/`resident_id`），由 zod schema 强校验。**
 > 类型单一真源：`@lunhui/engine/types`（`AnswerMode` 等）+ `packages/web/src/api.ts` 响应接口。
+>
+> **鉴权（Phase 1，桌面客户端为唯一面向客户端）**：除 `/api/health`、`/api/auth/*`、`/api/events/stream` 外，
+> 所有路由需在 `Authorization: Bearer <token>` 中携带 JWT（先 register 或 login 获取）。未携带/失效 → `401 UNAUTHORIZED`。
+
+## 0. GET POST /api/auth/register 注册
+
+请求：
+```json
+{ "username": "阿渡", "password": "secret123" }
+```
+响应 `200`：
+```json
+{ "playerId": 1, "username": "阿渡", "token": "<jwt>" }
+```
+错误：`400 USERNAME_INVALID`、`400 WEAK_PASSWORD`（密码 < 6 位）、`409 USERNAME_TAKEN`。
+
+## 0.1 POST /api/auth/login 登录
+
+请求同 register；成功响应同 register（返回 token）。密码错误 → `401 INVALID_CREDENTIALS`。
+登录按 IP 限流，超限 → `429 RATE_LIMITED`。
 
 ## 1. POST /api/loop 开始/重开轮回
 
@@ -90,34 +110,46 @@
 - 服务端只返回**强记忆**：`strength ≥ 0.3`，永久记忆优先，最多 20 条；
 - 非永久记忆每轮回衰减 ×0.8（repository.decayMemories）。
 
-## 5. GET /api/health 健康检查
+## 5. GET /api/events/stream WebSocket 事件流（实时推送）
+
+- 需在 query 传 `?token=<jwt>`（握手阶段浏览器无法附 Authorization 头，故走 query）。
+- 建立后按玩家订阅 broker，实时收到 `events` 行（JSON）：其字段同 `POST /api/loop` 响应里的 `events`。
+- token 失效 → 返回 `{ "error": { "code": "UNAUTHORIZED" } }` 并断开。
+- 隔离：B 玩家订阅不到 A 玩家的事件。
+
+## 6. GET /api/health 健康检查
 
 响应 `200`：
 ```json
 { "status": "ok", "service": "lunhui-dukou" }
 ```
 
-## 6. 错误码总表（已实现）
+## 7. 错误码总表（已实现）
 
 | code | HTTP | 含义 |
 |---|---|---|
+| UNAUTHORIZED | 401 | 未登录 / token 缺失或失效（受保护路由） |
+| INVALID_CREDENTIALS | 401 | 登录用户名或密码错误 |
+| USERNAME_TAKEN | 409 | 注册用户名已存在 |
+| RATE_LIMITED | 429 | 触发限流（/api/ask 按玩家 / login 按 IP / LLM 按玩家） |
 | NO_QUESTIONS_LEFT | 403 | 本轮回额度用完 |
-| LOOP_NOT_FOUND | 404 | 轮回不存在 |
+| LOOP_NOT_FOUND | 404 | 轮回不存在，或不属于当前玩家 |
 | RESIDENT_NOT_ACTIVE | 404 | 居民未出场 |
 | LOOP_ENDED | 409 | 轮回已结束（重复 choice/ask） |
+| USERNAME_INVALID / WEAK_PASSWORD | 400 | 注册校验失败 |
 | （其他未分类错误） | 500 | 统一错误形状返回 |
 
 校验失败（zod，body/params 不合法）由 Fastify 返回 `400`，形状为 Fastify 默认校验错误（非统一错误形状）。
 
-## 7. 规划中 / 未实现（不得当作现有契约引用）
+## 8. Phase 1 已落地 / 明确不做
 
 | 项 | 状态 |
 |---|---|
-| `GET /api/events/stream` SSE 事件流 | 未实现（events 目前随 `/api/loop` 响应一次性下发） |
-| `LLM_UNAVAILABLE` (503) 错误码 | 未实现（LLM 全部失败走保守兜底文本，HTTP 200 + `usedLlm:false`，不暴露 503） |
-| `RATE_LIMITED` (429) 错误码 | 未实现（成本熔断由 cockatiel provider 级熔断承担：连续失败 → 熔断跳过 → 兜底，见 llm-generator.ts） |
+| `GET /api/events/stream` WebSocket 事件流 | ✅ 已实现（broker + @fastify/websocket，见 routes/events-stream.ts） |
+| `RATE_LIMITED` (429) | ✅ 已实现（/api/ask 按玩家、login 按 IP、LLM 按玩家，见 services/rate-limiter.ts） |
 | 请求体 camelCase 化 | 未排期（历史 snake_case 已被 zod 契约锁定） |
+| `LLM_UNAVAILABLE` (503) | 不做（LLM 全部失败走保守兜底文本，HTTP 200 + `usedLlm:false`，不暴露 503） |
 
-## 8. 离线模式
+## 9. 离线模式
 
 `VITE_OFFLINE=true` 构建或后端不可达时，web 自动切 `offlineClient`（零后端零 token 确定性判定，形状与上述一致）。详见 `packages/web/src/offlineClient.ts`。

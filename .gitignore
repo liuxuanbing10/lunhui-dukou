@@ -40,5 +40,6 @@ coverage/
 .workbuddy/
 .playwright-mcp/
 .tmp-qwen/
+.omo/
 blend1
 packages/web/src/assets/scene/*.blend*

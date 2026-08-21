@@ -1,7 +1,22 @@
 # 数据模型（字段级定稿）
 
-> 六张核心表。建表以本文档为准。变更须先改本文档。
+> 七张核心表。建表以本文档为准。变更须先改本文档。
 > 存储：SQLite（better-sqlite3）。所有表含 `created_at TEXT DEFAULT (datetime('now'))`。
+>
+> **Phase 1 补充（DESKTOP_MIGRATION.md）：多玩家云端化。**
+> 1. 新增 **players 玩家表**（账号/鉴权基础）；
+> 2. `loops / memories / events / questions / world_states` 五张内容表均追加 `player_id INTEGER NOT NULL REFERENCES players(id)`，
+>    额度与记忆按玩家隔离；`repository` 全部读写携带 `player_id`（B 玩家查 A 的 loop/记忆得到空）。
+> 现有旧 dev 库由 `db/index.ts` 的 `migrate()` 用 `ALTER TABLE ADD COLUMN player_id INTEGER NOT NULL DEFAULT 0` 自动补列（幂等）。
+> 确切 DDL 以 `packages/server/src/db/schema.ts` 为准。
+
+## 0. players（玩家表，Phase 1 新增）
+
+| 字段 | 类型 | 约束 | 说明 |
+|---|---|---|---|
+| id | INTEGER | PK AUTOINCREMENT | |
+| username | TEXT | UNIQUE NOT NULL | 登录名 |
+| password_hash | TEXT | NOT NULL | `salt:scryptHash`（node:crypto） |
 
 ## 1. residents（居民表）
 

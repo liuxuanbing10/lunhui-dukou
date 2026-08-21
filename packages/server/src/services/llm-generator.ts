@@ -24,6 +24,15 @@ import type { CircuitBreakerPolicy, IPolicy, IDefaultPolicyContext } from 'cocka
 import type { Resident } from '@lunhui/engine';
 import { getMemories } from '../db/repository.js';
 import type { Database } from 'better-sqlite3';
+import { rateLimit } from './rate-limiter.js';
+
+// ---- Phase 1 限流参数（LLM 调用，按玩家） ----
+function llmRateMax(): number {
+  return Number(process.env.RATE_LIMIT_LLM_MAX ?? '30');
+}
+function llmRateWindow(): number {
+  return Number(process.env.RATE_LIMIT_LLM_WINDOW_MS ?? '60000');
+}
 
 interface Provider {
   name: string;
@@ -172,9 +181,14 @@ function buildSystemPrompt(resident: Resident): string {
   ].join('\n');
 }
 
-/** 组装用户消息：记忆 + 问题 */
-function buildUserPrompt(resident: Resident, question: string, db: Database): string {
-  const memories = getMemories(db, resident.id, 3);
+/** 组装用户消息：记忆 + 问题（记忆按玩家隔离） */
+function buildUserPrompt(
+  resident: Resident,
+  question: string,
+  db: Database,
+  playerId: number,
+): string {
+  const memories = getMemories(db, playerId, resident.id, 3);
   const memText =
     memories.length > 0
       ? `【你记得的片段】\n${memories.map((m) => `- ${m.content as string}`).join('\n')}`
@@ -222,6 +236,7 @@ export async function generateAnswer(
   resident: Resident,
   question: string,
   db: Database,
+  playerId: number,
 ): Promise<{ text: string; provider: string }> {
   // Mock 模式：测试/CI 不烧 token（真实调用只在显式需要时跑）
   if (process.env.LLM_MOCK === '1') {
@@ -231,9 +246,17 @@ export async function generateAnswer(
     };
   }
 
+  // Phase 1 限流：按玩家滑动窗口限制 LLM 调用量（防单玩家烧穿预算，见 DECISIONS.md D2）
+  if (!rateLimit(`llm:${playerId}`, llmRateMax(), llmRateWindow())) {
+    return {
+      text: `（${resident.name}沉默了片刻，雨声很大。他没有回答。）`,
+      provider: 'none',
+    };
+  }
+
   const providers = buildProviders();
   const systemPrompt = buildSystemPrompt(resident);
-  const userPrompt = buildUserPrompt(resident, question, db);
+  const userPrompt = buildUserPrompt(resident, question, db, playerId);
 
   if (providers.length === 0) {
     return {
