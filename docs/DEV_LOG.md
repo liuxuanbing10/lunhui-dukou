@@ -6,6 +6,24 @@
 
 ---
 
+## 2026-08-21 · 签名与杀毒应对 + godot-mcp 接通检查
+
+**本次内容**：
+1. **godot-mcp**：连通运行中的 Godot 编辑器并拉取项目信息（name/renderer/features `["4.8","C#","GL Compatibility"]`）；所连进程无可用 editor GUI（scene 系操作返回 "Editor interface not available"），深测仍走 CLI。
+2. **签名**：`New-SelfSignedCertificate` 建 `CN=Lunhui Dukou` 代码签名证书（指纹 `2A6A…9BD`），`signtool sign /fd SHA256 /sha1` 签署 `build/LunhuiDukou.exe`；封装可复用脚本 `app/scripts/distribute/sign.ps1`（自动建证书/签名/校验）。
+3. **杀毒应对**：新文档 `docs/ANTIVIRUS.md`（为何被拦、Defender 排除、扫描、VirusTotal 交叉验证、OV/EV 建议）。
+
+**验证**：`sign.ps1` 用 pwsh 跑通（`Successfully signed`，1 error 为 verify 对自签证书"不受信任"的预期提示）；`signtool verify /pa` 确认 Authenticode 结构有效；本机 Defender 实时保护关闭、无威胁检测，暂无扫描可跑。
+
+**坑**：
+- 含 UTF-8 中文的 .ps1 用 Windows PowerShell 5.1 跑会按 GBK 误读致解析错乱——**脚本保持纯 ASCII（英文）**最稳；
+- `param` 默认值不能用 `$PSScriptRoot`（parser error），改到函数体内解析；
+- 自签名不消除 SmartScreen 告警（需 OV/EV 或商店分发），已在 ANTIVIRUS.md 说明。
+
+**下一步**：GUI 试玩验收（G1）；正式发布前购/配签名证书 + 开着 Defender 重扫。
+
+---
+
 ## 2026-08-21 · 桌面化 Phase 4：Windows 包导出成功（LunhuiDukou.exe ~116MB）
 
 **本次内容**：在用户扩容/重启释放内存后，把 Godot 桌面端导出为 Windows 自包含包。

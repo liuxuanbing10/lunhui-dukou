@@ -104,6 +104,7 @@
   `godot --headless --path app --export-release "Windows 桌面" build/LunhuiDukou.exe`
   （预设 `app/export_presets.cfg`，`exclude_filter="addons/*"` 不打包开发插件）
 - **导出注意**：模板需放在编辑器要求的版本目录 `%APPDATA%\Godot\export_templates\4.8.dev3.mono\`（带 `.mono` 后缀）；导出前需创建 `build/`；此前因系统虚拟内存不足（页面文件过小）受阻，扩容/重启后成功。
+- **签名与杀毒应对 ✅（2026-08-21）**：exe 已用自签名代码签名证书签署（`app/scripts/distribute/sign.ps1` 可复用，见 [docs/ANTIVIRUS.md](ANTIVIRUS.md)）。自签名仅限开发/内部分发；正式发布需 OV/EV 证书或商店分发以消除 SmartScreen 告警；杀软误报处理见该文档。
 
 ---
 
