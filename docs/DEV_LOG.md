@@ -6,6 +6,21 @@
 
 ---
 
+## 2026-08-21 · 真3D 演出层：ResidentRig 程序化动画接入（G1 演出语言定稿）
+
+**本次内容**：落实"升级真 3D"决策——新建 `app/scripts/ResidentRig.cs`，给 8 位居民各挂一层程序化动画刚体，在 Godot C# 侧驱动 GLB 内独立 MeshInstance3D 子节点（Coat/Head/ArmL/ArmR）。
+1. **能力**：整体呼吸起伏、手臂摆动（幅度随选中/命中放大）、头部环视、整身朝向玩家（LerpAngle 平滑）、命中后仰受压、选中强调；`Setup` 保存各部位初始姿态，避免覆盖原配饰倾角；全部 try-catch，节点缺失即跳过不崩。
+2. **Main.cs 接入**：`_BuildWorld` 居民节点由 `Node3D` 换为 `ResidentRig`（维护 `_rigs[rid]` 字典）；选人 `ItemSelected` → 当事人 `SetSelected(true)` + `FaceTarget(camera)`；`EnterIntroPhase` → 开局当前居民面向玩家；`SilenceRevealAsync` 命中真相 → `TriggerHit()`。
+3. **方案取向**：不重做 Blender 骨骼资产，走 C# 程序化动画——**规避 R1**（不依赖 4.8-dev3 编辑器级动画/资产工具，全走 dotnet build + CLI），同时 R4 友好（居民模型仍由 `residents_build.py` 脚本生成）。G1 演出语言门由"2.5D 待定"转为"真 3D 定稿"。
+
+**验证**：`dotnet build` 0 错误（6 条 CS4014 为既有 async void，非本次引入）；`godot --headless --path app --quit-after 120` 干净退出、无 SCRIPT ERROR，ResidentRig 在 `_Ready`/`_Process` 正常初始化；"后端开局失败转本地兜底"为无后端预期路径。
+
+**坑**：`dotnet build` 在 `.sln` 上默认 `Debug|x64` 平台配置无效——直接 build `.csproj`（`dotnet build LunhuiDukou.csproj`）。
+
+**下一步**：G1 GUI 真机实测确认动画手感；文档同步收尾（README/TECHNOLOGY/DEVELOPMENT 反映桌面化）；MVP 边界内打磨。
+
+---
+
 ## 2026-08-21 · godot-mcp 换装后首测：运行时深检通过 + 修补 6 处脚本告警
 
 **验证（新 stdio server）**：`get_project_info`（轮回渡口/4.8dev3/C#）、`get_godot_version`、无头 `read_scene` 读 Main.tscn 全通；`run_project` 拉起游戏后用 `game_get_scene_tree` 确认**运行时世界完整**（8 位居民、三船/hull/canopy/lamp、河岸、雨/暖声、相机、登录 UI）；`get_debug_output`/`stop_project` 正常。
