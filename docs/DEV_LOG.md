@@ -6,6 +6,29 @@
 
 ---
 
+## 2026-08-21 · 桌面化 Phase 2：Godot 演出层移植（波形机/相位/沉默留白/主题/音频）
+
+**本次内容**：把 web 演出层语义落到 Godot 节点（对齐 web/src/App.tsx + useTypewriter + theme.ts + audio.ts）。
+1. **相位状态机**：boot→intro→choice→death→memory 五种相位；death 用全屏暗调面板（后果+死因+「进入下一轮」），memory 用记忆叠影面板（跨世记忆+继续）。
+2. **打字机对话**：intro/memory 逐字揭示（35ms/字，web useTypewriter 同速）。
+3. **「沉默三秒」视听留白**：命中关键真相→暖光 `light_energy` 收束 dim + 全屏遮罩淡入 + 雨声/暖压暗 + 钟鸣泛音，再揭示那句点睛真相→进入 choice。
+4. **主题 token**：`ThemeTokens.cs` 移植 theme.ts 占位色（雨夜冷蓝/暖光/墨色/记忆琥珀/沉默暗调）并上色到 UI（面板/文本/强调按钮）。
+5. **程序化音频** `AmbientAudio.cs`：生成 PCM→`AudioStreamWav`（雨声床=白噪2s循环、暖 pad=65/98Hz、钟鸣=523Hz+谐波衰减、否决=140→70Hz、往生=55Hz沉水、笛音=五声音阶+颤音+慢包络），`SetSilence` 压暗雨/暖；headless 无音频设备不崩。
+
+**验证**：
+- `dotnet build` 0 错误；
+- `LUNHUI_TEST_SESSION=1` → `SESSION_MIGRATE_PASS`（相位/UI/音频构建无报错）；
+- 起 server + `LUNHUI_SMOKE=1` → `SMOKE_PASS`（r1+r8 云端命中，重构后回归稳）；
+- 普通无头运行（后端不可达）→ 干净退出、进登录/离线兜底。
+
+**坑**：
+- **`app/_tmp_selftest/obj` 残留**导致 `CS0579 特性重复`——临时工程 dir 被主工程默认 glob `**/*.cs` 二次包含其生成文件；删除临时文件夹即可（教训：删临时工程要看对 cwd，DeleteFile 只删了 cs，obj 留了下来）。
+- C# double/float 混算：`dur`(double) 参与包络使 lambda 返回 double（CS0266/CS1662）→ 转 `float` 局部；`Control.SizeFlags.End` 为 `ShrinkEnd`。
+
+**下一步**：真模型/立绘接入（Blender）、镜头运镜、音频混音打磨；G1 决策门待 GUI 实测。
+
+---
+
 ## 2026-08-21 · 桌面化 Phase 3②：客户端接入 8 居民真相表 + 会话迁移
 
 **本次内容**：

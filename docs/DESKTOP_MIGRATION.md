@@ -83,13 +83,10 @@
 - **验收**：模拟两个玩家，各自 10 问额度互不串、记忆互不可见；LLM 超时/熔断回归不挂。
 - **决策门 G0**：SQLite 本阶段继续保留，不换 Postgres（并发量远未到触发线，触发条件见 ARCHITECTURE.md）。
 
-### Phase 2 · Godot 演出层移植（核心工作量）
-- 范围：把 Web 演出层**语义**落到 Godot 节点/场景——
-  - 对话/打字机 UI → Control 节点 + `Tween`（替代 `web/src/hooks/useTypewriter.ts`）；
-  - 四种相位 `boot/intro/choice/death/memory` → Godot 场景/状态机（对应 `web/src/App.tsx`）；
-  - 雨/粒子/镜头/沉默收束 → `GPUParticles` + `Camera3D` 动画（移植 `web/src/scene/RainNight.tsx` 语义）；
-  - 主题 token（`web/src/visual/theme.ts`）→ Godot `Theme`/`Resource`；
-  - 音频全重写：Web Audio 程序化 → Godot 音频总线（复用 `docs/audio-design.md` 语义）。
+### Phase 2 · Godot 演出层移植（核心工作量）<!-- ✅ 核心语义已落地，见 DEV_LOG 2026-08-21 -->
+- 范围：把 Web 演出层**语义**落到 Godot 节点/场景。
+- **已落地**：相位状态机 boot→intro→choice→death→memory（对齐 web/src/App.tsx）；打字机对话（intro/memory 逐字，35ms/字）；「沉默三秒」视听留白（命中关键→暖光收束 dim + 雨声/暖压暗 + 钟鸣泛音）；死亡相位（全屏暗调+后果+死因+进入下一轮）；记忆相位（跨世记忆叠影+继续）；主题 token（ThemeTokens 对齐 art-style-2.5d 上色到 UI）；程序化音频 AmbientAudio（雨声床/暖 pad/钟鸣/否决/往生/笛音，生成 PCM→AudioStreamWav，无外部文件）。
+- **待做**：真模型/立绘接入、镜头运镜细化、审问节奏微调、音频 bus 混音打磨。
 - **验收**：8 居民立绘/场景切换、审问节奏、"沉默三秒"完整演出、死亡/记忆相位可跑。
 
 ### Phase 3 · 内容与存档接通
