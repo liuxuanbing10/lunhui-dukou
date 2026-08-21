@@ -2,6 +2,27 @@
 
 > 本文档描述《轮回渡口》的运行时架构。配合 `docs/SPEC.md`（产品）与 `docs/TECHNOLOGY.md`（技术选型）阅读。
 
+> ⚠️ **迁移状态（2026-08-21 起）**：项目已从 Web 版转向**桌面化（Godot 客户端 + 云 AI 后端）**，见
+> [DESKTOP_MIGRATION.md](DESKTOP_MIGRATION.md)。下列第 1～7 节描述的 `@lunhui/web` 演出层与 SSE 事件流
+> 已被 **Godot 客户端（`app/`）改用 HTTP 审问、事件流已由 SSE 改为 WebSocket** 所取代；engine/server 分层、
+> 真相表/记忆/LLM 容灾与数据表**保持不变**。目标运行时拓扑见下文「迁移后的目标架构」。
+
+## 迁移后的目标架构
+
+```
+┌─ Windows 桌面客户端（Godot 4.8 mono / C#）──────────┐
+│  演出层：Blender 3D 场景 + 2D 立绘 + 雨夜/粒子/音频   │
+│  对话·选择·轮回 UI · 本地存档（user://）              │
+│  HTTP / WebSocket（事件流）──────────────┐          │
+└──────────────────────────────────────────┼──────────┘
+                                           ▼
+┌──────── 云 AI 后端（@lunhui/server / Fastify 5）─────┐
+│  JWT 账号/鉴权 · 多玩家额度与记忆隔离(player_id) · 限流│
+│  真相表判定(@lunhui/engine) · LLM 多 provider 容灾     │
+│  SQLite(better-sqlite3)                              │
+└─────────────────────────────────────────────────────┘
+```
+
 ## 1. 总体分层
 
 ```

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { matchFact } from './truth-table.js';
+import { matchFact, judgeAsk } from './truth-table.js';
 import type { Resident } from './types.js';
 
 /**
@@ -39,5 +39,55 @@ describe('truth-table 匹配', () => {
     ]);
     const r = matchFact('今天天气不错', resident);
     expect(r.matched).toBe(false);
+  });
+});
+
+describe('judgeAsk 判定（直接单测）', () => {
+  const keyResident = makeResident([
+    { id: 'f-key', keywords: ['号码'], isKey: true, statement: '号码是对的。' },
+    { id: 'f-plain', keywords: ['天气'], isKey: false, statement: '今晚要下雨。' },
+  ]);
+
+  it('命中关键事实 → direct + pause + hitFactId（沉默三秒）', async () => {
+    const r = await judgeAsk('号码是多少？', keyResident);
+    expect(r.answerMode).toBe('direct');
+    expect(r.pause).toBe(true);
+    expect(r.hitFactId).toBe('f-key');
+    expect(r.usedLlm).toBe(false);
+    expect(r.answer).toContain('号码是对的');
+  });
+
+  it('命中普通事实 → direct、不暂停', async () => {
+    const r = await judgeAsk('今晚天气怎么样？', keyResident);
+    expect(r.answerMode).toBe('direct');
+    expect(r.pause).toBe(false);
+    expect(r.hitFactId).toBe('f-plain');
+  });
+
+  it('未命中 + fallback 返回纯文本 → rhetoric 且视为 LLM', async () => {
+    const r = await judgeAsk('你好吗？', keyResident, async () => '我很好。');
+    expect(r.answerMode).toBe('rhetoric');
+    expect(r.pause).toBe(false);
+    expect(r.answer).toBe('我很好。');
+    expect(r.usedLlm).toBe(true);
+  });
+
+  it('未命中 + fallback 返回 {text,usedLlm:false} → rhetoric 且省 token', async () => {
+    const r = await judgeAsk('你好吗？', keyResident, async () => ({ text: '保守回答。', usedLlm: false }));
+    expect(r.usedLlm).toBe(false);
+    expect(r.answer).toBe('保守回答。');
+  });
+
+  it('未命中且无 fallback → silence 兜底', async () => {
+    const r = await judgeAsk('今天中午吃啥？', keyResident);
+    expect(r.answerMode).toBe('silence');
+    expect(r.pause).toBe(false);
+    expect(r.usedLlm).toBe(false);
+  });
+
+  it('真相级试探词 → 不揭底，回退 silence（防被套出真相）', async () => {
+    const r = await judgeAsk('你是谁？', keyResident);
+    expect(r.answerMode).toBe('silence');
+    expect(r.hitFactId).toBeUndefined();
   });
 });

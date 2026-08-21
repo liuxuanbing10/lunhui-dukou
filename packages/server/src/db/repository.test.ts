@@ -109,7 +109,7 @@ describe('repository', () => {
     const loopId = createLoop(testDb, playerId, 1);
     addEvent(testDb, playerId, loopId, 'ambient', '雨声很大', false, false);
     addEvent(testDb, playerId, loopId, 'clue', '阿岚在渡口放白花', true, false);
-    const events = getEvents(testDb, loopId);
+    const events = getEvents(testDb, playerId, loopId);
     expect(events.length).toBe(2);
     expect(events[1]?.is_clue).toBe(1);
   });

@@ -65,20 +65,34 @@ public partial class Main : Node3D
     private Label? _memoryLines;
 
     private Camera3D _camera = null!;
-    private Vector3 _baseCam = new(0, 6, 14);
-    private float _baseFov = 60f;
+    private readonly System.Collections.Generic.Dictionary<string, ResidentRig> _rigs = new();
+    // 第一人称：相机在主角眼睛高度，放在小镇街道中央
+    private Vector3 _baseCam = new(0, 1.7f, 0);
+    private float _baseFov = 75f;
     private float _time;
 
     public override void _Process(double delta)
     {
         if (_camera == null) return;
         _time += (float)delta;
-        // 缓摆仰视（旷街阿飞感的小运镜）
-        var sway = new Vector3(Mathf.Sin(_time * 0.18f) * 0.25f, Mathf.Sin(_time * 0.45f) * 0.06f, 0);
+        // 第一人称：轻微呼吸晃动（模拟主角站立时的自然晃动）
+        var sway = new Vector3(
+            Mathf.Sin(_time * 0.8f) * 0.008f,
+            Mathf.Sin(_time * 1.2f) * 0.015f,
+            0);
         var desired = _baseCam + sway;
-        _camera.Position = _camera.Position.Lerp(desired, (float)delta * 3f);
+        _camera.Position = _camera.Position.Lerp(desired, (float)delta * 5f);
         _camera.Fov = Mathf.Lerp(_camera.Fov, _baseFov, (float)delta * 3f);
-        _camera.LookAt(new Vector3(0, 1.5f, 0), Vector3.Up);
+        // 第一人称：相机看向正前方（居民站的方向）
+        _camera.LookAt(new Vector3(0, 1.5f, -5f), Vector3.Up);
+
+        // 确保 UI root 始终匹配视口尺寸
+        if (_ui != null && _ui.GetChildCount() > 0 && _ui.GetChild(0) is Control rootCtrl)
+        {
+            var targetSize = GetTree().Root.Size;
+            if (rootCtrl.Size != targetSize)
+                rootCtrl.Size = targetSize;
+        }
     }
 
     public override void _Ready()
@@ -92,60 +106,26 @@ public partial class Main : Node3D
         _BuildWorld();
         _BuildUi();
 
-        if (OS.GetEnvironment("LUNHUI_SMOKE") == "1") { RunSmokeAsync(); return; }
-        if (OS.GetEnvironment("LUNHUI_TEST_SESSION") == "1") { RunSessionCheck(); return; }
+        // CanvasLayer 不会自动给子 Control 提供视口尺寸
+        // 必须在 _Ready 中显式设置 root 尺寸
+        if (_ui != null && _ui.GetChildCount() > 0 && _ui.GetChild(0) is Control rootCtrl)
+            rootCtrl.Size = GetTree().Root.Size;
+
+        if (OS.GetEnvironment("LUNHUI_SMOKE") == "1") { _RunSmokeAsync(); return; }
+        if (OS.GetEnvironment("LUNHUI_TEST_SESSION") == "1")
+        {
+            GetTree().Quit(DevChecks.RunSessionCheck() ? 0 : 1);
+            return;
+        }
 
         if (_session is { Token.Length: > 0 }) BeginLoopAsync();
         else ShowLogin();
     }
 
-    // ---------- 云端/E2E ----------
-    private async void RunSmokeAsync()
+    // ---------- 开发期诊断触发（实现见 DevChecks，仅负责退出码） ----------
+    private async void _RunSmokeAsync()
     {
-        try
-        {
-            GD.Print($"[smoke] base={DefaultBaseUrl}");
-            var server = new ServerClient(DefaultBaseUrl);
-            var username = "smoke" + (GD.Randi() % 900000 + 100000);
-            GD.Print($"[smoke] register {username}");
-            var auth = await server.RegisterAsync(username, "secret123");
-            GD.Print($"[smoke] token_len={auth.Token.Length}");
-            var loop = await server.StartLoopAsync(auth.Token);
-            GD.Print($"[smoke] loopId={loop.LoopId} seq={loop.Sequence} left={loop.QuestionsLeft}");
-            var ask = await server.AskAsync(auth.Token, loop.LoopId, "r1", "你捞过我吗？");
-            GD.Print($"[smoke] r1 answer='{ask.Answer}' mode={ask.AnswerMode} pause={ask.Pause} left={ask.QuestionsLeft}");
-            var ask2 = await server.AskAsync(auth.Token, loop.LoopId, "r8", "你怎么知道我的名字？");
-            GD.Print($"[smoke] r8 answer='{ask2.Answer}' mode={ask2.AnswerMode} pause={ask2.Pause}");
-            if (ask.Pause && ask.AnswerMode == "direct" && ask.QuestionsLeft == 9
-                && ask2.Pause && !string.IsNullOrEmpty(ask2.Answer))
-            {
-                GD.Print("SMOKE_PASS");
-                GetTree().Quit(0);
-            }
-            else
-            {
-                GD.PrintErr("SMOKE_FAIL: 判定不符");
-                GetTree().Quit(1);
-            }
-        }
-        catch (System.Exception e)
-        {
-            GD.PrintErr($"[smoke] ERROR: {e.Message}");
-            GetTree().Quit(1);
-        }
-    }
-
-    private void RunSessionCheck()
-    {
-        SessionStore.Clear();
-        using (var f = FileAccess.Open("user://session.json", FileAccess.ModeFlags.Write))
-            f.StoreString("{\"BaseUrl\":\"\",\"Token\":\"legacy\",\"PlayerId\":7,\"Username\":\"u\",\"LoopId\":5}");
-        var loaded = SessionStore.Load();
-        bool ok = loaded != null
-            && loaded.Version == SessionStore.CurrentVersion
-            && loaded.Token == "legacy"
-            && loaded.BaseUrl == "http://127.0.0.1:8787";
-        GD.Print(ok ? "SESSION_MIGRATE_PASS" : "SESSION_MIGRATE_FAIL");
+        bool ok = await DevChecks.RunSmokeAsync(DefaultBaseUrl);
         GetTree().Quit(ok ? 0 : 1);
     }
 
@@ -170,23 +150,26 @@ public partial class Main : Node3D
         };
         AddChild(_moodLight);
 
-        _camera = new Camera3D { Fov = 60 };
+        _camera = new Camera3D { Fov = 75 };
         AddChild(_camera);
-        _camera.LookAtFromPosition(new Vector3(0, 6, 14), new Vector3(0, 0, 0), Vector3.Up);
+        _camera.LookAtFromPosition(new Vector3(0, 1.7f, 0), new Vector3(0, 1.5f, -5f), Vector3.Up);
 
-        // 8 位居民：各自 Blender 真模型（resident_r{id}.glb），失败回退胶囊
+        // 8 位居民：排成弧形站在主角面前（z=-3~-5），第一人称视角下清晰可见
         for (int i = 0; i < GameLogic.All.Length; i++)
         {
-            float childScale = GameLogic.All[i].Id == "r8" ? 0.62f : 1f;
-            var node = new Node3D
+            string rid = GameLogic.All[i].Id;
+            float childScale = rid == "r8" ? 0.62f : 1f;
+            float angle = (i - 3.5f) * 0.22f; // 弧形分布，跨度更大
+            var rig = new ResidentRig
             {
-                Position = new Vector3((i - 3.5f) * 1.7f, 0, 2.6f + (i % 2) * 0.4f),
+                Position = new Vector3(Mathf.Sin(angle) * 4f, 0, -3.5f - Mathf.Cos(angle) * 0.8f),
                 Scale = new Vector3(childScale, childScale, childScale),
             };
-            var body = _TryLoadResidentModel(GameLogic.All[i].Id);
+            var body = _TryLoadResidentModel(rid);
             if (body == null) body = _CapsuleBody();
-            node.AddChild(body);
-            AddChild(node);
+            rig.Setup(body);
+            AddChild(rig);
+            _rigs[rid] = rig;
         }
 
         _TryAddRain();
@@ -275,9 +258,9 @@ public partial class Main : Node3D
         _ui = new CanvasLayer { Layer = 10 };
         AddChild(_ui);
 
+        // root: 用 Control 做容器，显式设置尺寸（CanvasLayer 不提供大小）
         var root = new Control { Name = "Root" };
-        root.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
-        root.Theme = new Theme { DefaultFont = _ChineseFont(), DefaultFontSize = 18 };
+        root.Size = GetTree().Root.Size;
         _ui.AddChild(root);
 
         _BuildLoginPanel(root);
@@ -330,28 +313,34 @@ public partial class Main : Node3D
 
     private void _BuildGamePanel(Control root)
     {
-        var outer = new VBoxContainer
-        {
-            Name = "GamePanel",
-            OffsetLeft = 40,
-            OffsetTop = 24,
-            OffsetRight = -40,
-            OffsetBottom = -24,
-        };
+        // vbox 用 anchors 铺满 root（减去边距），不依赖 root 的初始尺寸
+        var vbox = new VBoxContainer { Name = "GamePanel" };
+        vbox.AnchorLeft = 0f;
+        vbox.AnchorTop = 0f;
+        vbox.AnchorRight = 1f;
+        vbox.AnchorBottom = 1f;
+        vbox.OffsetLeft = 40;
+        vbox.OffsetTop = 24;
+        vbox.OffsetRight = -40;
+        vbox.OffsetBottom = -24;
+
         _header = new Label { Name = "Header" };
         _header.AddThemeColorOverride("font_color", ThemeTokens.InkDim);
-        outer.AddChild(_header);
+        vbox.AddChild(_header);
 
         _narrator = new Label
         {
             Name = "Narrator",
             SizeFlagsVertical = Control.SizeFlags.ExpandFill,
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
             AutowrapMode = TextServer.AutowrapMode.WordSmart,
         };
         _narrator.AddThemeColorOverride("font_color", ThemeTokens.InkPrimary);
 
-        // 立绘（当前居民 2D 图，Web 资产同源）｜ 文字区
+        // narRow 限制最大高度，避免把下面的控件挤出屏幕
         var narRow = new HBoxContainer { Name = "NarRow" };
+        narRow.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
+        narRow.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         _portrait = new TextureRect
         {
             Name = "Portrait",
@@ -362,9 +351,12 @@ public partial class Main : Node3D
         _portrait.CustomMinimumSize = new Vector2(150, 210);
         narRow.AddChild(_portrait);
         narRow.AddChild(_narrator);
-        outer.AddChild(narRow);
+        vbox.AddChild(narRow);
 
+        // 交互行：确保不被 ExpandFill 挤掉
         var selRow = new HBoxContainer { Name = "SelRow" };
+        selRow.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
+        selRow.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         var selLabel = new Label { Text = "向谁问：" };
         selLabel.AddThemeColorOverride("font_color", ThemeTokens.InkDim);
         selRow.AddChild(selLabel);
@@ -375,11 +367,18 @@ public partial class Main : Node3D
         {
             _residentId = GameLogic.All[(int)idx].Id;
             _UpdatePortrait();
+            if (_rigs.TryGetValue(_residentId, out var rig))
+            {
+                rig.SetSelected(true);
+                if (_camera != null) rig.FaceTarget(_camera.GlobalPosition);
+            }
         };
         selRow.AddChild(_residentSel);
-        outer.AddChild(selRow);
+        vbox.AddChild(selRow);
 
         var inputRow = new HBoxContainer { Name = "InputRow" };
+        inputRow.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
+        inputRow.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         _input = new LineEdit
         {
             Name = "AskInput",
@@ -389,20 +388,22 @@ public partial class Main : Node3D
         _askBtn = _AccentButton("开口问");
         inputRow.AddChild(_input);
         inputRow.AddChild(_askBtn);
-        outer.AddChild(inputRow);
+        vbox.AddChild(inputRow);
 
         _choiceBox = new HBoxContainer { Name = "ChoiceBox", Visible = false };
+        _choiceBox.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
+        _choiceBox.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         var leave = _AccentButton("上船｜我想离开这个镇子");
         var stay = _AccentButton("留下｜我得先弄清我是谁");
         _choiceBox.AddChild(leave);
         _choiceBox.AddChild(stay);
-        outer.AddChild(_choiceBox);
+        vbox.AddChild(_choiceBox);
 
         _askBtn.Pressed += HandleAsk;
         _input.TextSubmitted += _ => HandleAsk();
         leave.Pressed += () => HandleChoice("leave");
         stay.Pressed += () => HandleChoice("stay");
-        root.AddChild(outer);
+        root.AddChild(vbox);
     }
 
     private void _BuildDeathPanel(Control root)
@@ -479,9 +480,7 @@ public partial class Main : Node3D
     private Button _AccentButton(string text)
     {
         var b = new Button { Text = text };
-        // 强调色描边，暗面板上清晰
-        b.AddThemeStyleboxOverride("normal", _PanelStyle(ThemeTokens.UiPanel));
-        b.AddThemeStyleboxOverride("hover", _PanelStyle(new Color(ThemeTokens.UiAccent, 0.25f)));
+        // 用 Godot 默认按钮样式，只覆盖字体颜色
         b.AddThemeColorOverride("font_color", ThemeTokens.InkPrimary);
         b.AddThemeColorOverride("font_hover_color", ThemeTokens.WarmGlow);
         return b;
@@ -531,14 +530,35 @@ public partial class Main : Node3D
         _loginStatus!.Text = register ? "注册中…" : "登录中…";
         try
         {
-            var auth = await _server!.RegisterAsync(user, pass);
+            // 分路径：注册走 register、登录走 login（原先两者都调 register，导致已注册用户无法登录）
+            var auth = register
+                ? await _server!.RegisterAsync(user, pass)
+                : await _server!.LoginAsync(user, pass);
             SaveSession(auth, 0);
             BeginLoopAsync();
         }
         catch (ServerException e)
         {
-            if (!register && e.Code == "INVALID_CREDENTIALS")
+            if (register && e.Code == "USERNAME_TAKEN")
             {
+                // 注册时账号已存在 → 改走登录（容错：既有账号直接登录）
+                _loginStatus!.Text = "账号已存在，尝试直接登录…";
+                try
+                {
+                    var auth = await _server!.LoginAsync(user, pass);
+                    SaveSession(auth, 0);
+                    BeginLoopAsync();
+                }
+                catch (System.Exception e2)
+                {
+                    _loginStatus!.Text = $"登录失败（{e2.Message}）——将进入本地判定";
+                    _loginPanel!.Visible = false;
+                    BeginLoopAsync();
+                }
+            }
+            else if (!register && e.Code == "INVALID_CREDENTIALS")
+            {
+                // 登录失败：账号不存在则自动注册；账号存在但密码错 → 本地判定
                 try
                 {
                     var auth = await _server!.RegisterAsync(user, pass);
@@ -570,13 +590,15 @@ public partial class Main : Node3D
     private void SaveSession(AuthResult auth, int loopId)
     {
         var baseUrl = _session?.BaseUrl ?? DefaultBaseUrl;
-        _session = new Session(baseUrl, auth.Token, auth.PlayerId, auth.Username, loopId, SessionStore.CurrentVersion);
+        _session = new Session(baseUrl, auth.Token, auth.PlayerId, auth.Username, loopId, SessionMigration.CurrentVersion);
         SessionStore.Save(_session);
     }
 
     // ---------- 轮回流转 ----------
     private async Task BeginLoopAsync()
     {
+        // 复位过渡锁：死亡轮回后也能重新开始提问（否则第二世起 HandleAsk 被永久拦截）
+        _transitioning = false;
         _loginPanel!.Visible = false;
         _audio?.Start();
 
@@ -629,6 +651,9 @@ public partial class Main : Node3D
         RefreshHeader();
         _EnterPhase(Phase.Intro);
         _UpdatePortrait();
+        // 真3D：开局让当前居民面向玩家（玩家视角默认在相机处）
+        if (_rigs.TryGetValue(_residentId, out var rig) && _camera != null)
+            rig.FaceTarget(_camera.GlobalPosition);
         await TypewriterAsync(intro);
         EnableAsk();
     }
@@ -700,6 +725,8 @@ public partial class Main : Node3D
         _audio?.SetSilence(true);
         _audio?.PlayReveal();
         if (_residentId == "r1") _UpdatePortrait("face_hit"); // 蓑衣人命中 → 表情帧
+        // 真3D：命中关键真相 → 当事人触发命中反应（后仰受压 + 手臂猛地扬起）
+        if (_rigs.TryGetValue(_residentId, out var rig)) rig.TriggerHit();
         _moodLight?.CreateTween().TweenProperty(_moodLight, "light_energy", 0.18f, 0.5f);
         _silenceDim!.Color = new Color(0, 0, 0, 0);
         _silenceDim.CreateTween().TweenProperty(_silenceDim, "color", new Color(0, 0, 0, 0.55f), 0.5f);
@@ -774,13 +801,13 @@ public partial class Main : Node3D
         if (p == Phase.Memory) _narrator!.Visible = false;
         else _narrator!.Visible = true;
 
-        // 相位机位/焦距（_Process 缓动逼近）
+        // 相位机位/焦距（第一人称，_Process 缓动逼近）
         (_baseCam, _baseFov) = p switch
         {
-            Phase.Choice => (new Vector3(0, 6, 13), 60f),
-            Phase.Death => (new Vector3(0, 3.5f, 6), 64f),   // 死亡贴脸收拢
-            Phase.Memory => (new Vector3(0, 5, 10), 56f),    // 记忆稍远景
-            _ => (new Vector3(0, 6, 14), 60f),               // Intro
+            Phase.Choice => (new Vector3(0, 1.7f, 0), 75f),
+            Phase.Death => (new Vector3(0, 1.7f, 0.5f), 80f), // 死亡时微微前倾
+            Phase.Memory => (new Vector3(0, 1.7f, 0), 70f),   // 记忆稍窄视角
+            _ => (new Vector3(0, 1.7f, 0), 75f),              // Intro
         };
     }
 

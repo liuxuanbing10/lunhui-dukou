@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>LunhuiDukou.Tests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+
+  <!-- GameLogic 为纯逻辑（不依赖 Godot），直接 link 源码到测试工程，使 CI/单测无需 Godot 工具链 -->
+  <ItemGroup>
+    <Compile Include="..\..\scripts\GameLogic.cs" Link="GameLogic.cs" />
+    <Compile Include="..\..\scripts\SessionModel.cs" Link="SessionModel.cs" />
+  </ItemGroup>
+
+</Project>

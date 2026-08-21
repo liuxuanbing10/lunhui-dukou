@@ -45,3 +45,16 @@ jobs:
 
       - name: Build
         run: npm run build --workspaces --if-present
+
+  # Godot 客户端的纯逻辑单测（GameLogic 不依赖 Godot API，可在 CI 的 dotnet 环境编译）
+  godot-logic-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Run Godot app pure-logic unit tests
+        run: dotnet test app/tests/GameLogic.Tests/GameLogic.Tests.csproj

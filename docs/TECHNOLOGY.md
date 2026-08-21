@@ -17,7 +17,8 @@
 |---|---|---|
 | `@lunhui/engine` | AI 生成引擎：真相表判定、记忆系统、关系网、事件发生器 | TS + node:test |
 | `@lunhui/server` | API 服务：审问/轮回/记忆路由 | Fastify 5 + SQLite |
-| `@lunhui/web` | 前端演出层：五件套（立绘/背景/动态/音效/镜头） | React 19 + Vite 6 |
+| `@lunhui/web` | 前端演出层（**已废弃**，演出迁 Godot；仅存作演出设计参考） | React 19 + Vite 6 |
+| `app/` | **桌面客户端（演出层，替代 web）** | Godot 4.8 mono（C#）+ Blender 4 资产 |
 
 ## 3. 关键依赖选型
 
@@ -58,6 +59,7 @@ flowchart LR
   npm run typecheck  # 0 error
   npm run test       # 0 fail
   npm run build      # 全部产出
+  dotnet test app/tests/GameLogic.Tests  # Godot 纯逻辑单测（GameLogic / Session 迁移）
 ```
 
 ## 6. 环境变量清单
@@ -88,3 +90,17 @@ flowchart LR
 | 需要复杂状态管理 | React 加 Zustand |
 | 需要前端组件测试 | 加 Vitest + Testing Library |
 | 需要多人协作开发 | 加 Changesets 管理版本 |
+
+## 9. 桌面端（Godot / Blender，方向见 DESKTOP_MIGRATION.md）
+
+| 项 | 选型 | 理由 |
+|---|---|---|
+| 游戏引擎 | **Godot 4.8-dev3 mono（C#）** | 引擎轻量、C# 与主创 TS 心智对齐；dev 版编辑器级自动化不稳，已用 **C# 程序化动画（ResidentRig）** 规避，不依赖编辑器资产/动画工具 |
+| 建模 | **Blender 5.2（无头脚本产出 glb）** | `app/scripts/blender/*.py` 脚本即唯一真源，不维护 `.blend`，可复现导出 `resident_r1..r8.glb` |
+| 演出层 | Godot 相位状态机（boot/intro/choice/death/memory）+ 打字机 + 程序化音频（AmbientAudio） | 对齐 art-style-standard-2.5d.md；PCM 生成无需外部音频文件 |
+| 网络 | **HTTP（审问/轮回/鉴权）+ WebSocket（事件流）** 连云端 server | 断网降级本地 `GameLogic` 真相表判定 |
+| 本地存档 | `user://session.json`（Session，含版本迁移） | 纯逻辑抽在 `SessionModel.cs` 可单测 |
+| 语言补充 | `app/` 为 **C#（mono）**；引擎/后端仍全 TS | 仅演出层换栈，玩法逻辑不动 |
+
+> 关键约束：`GameLogic` / `SessionMigration` 为**纯逻辑（不依赖 Godot）**，可脱离 Godot 工具链单测——这是 CI 能跑 `dotnet test` 的前提，请保持这两个文件的纯净分层。
+> 否决延续：桌面端不引入 Unity/Unreal（Godot 足够）；MCP 编辑器服务器仅 debug 构建启用，release 包不包含（安全红线）。

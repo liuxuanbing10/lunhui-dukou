@@ -16,6 +16,13 @@ var _key_map: Dictionary
 var _held_keys: Dictionary = {}
 
 func _ready() -> void:
+	# 安全守卫：MCP 服务器仅用于开发期编辑器深控（godot-mcp）。
+	# 正式发布（release）构建绝不启动，否则发布包会随附一个无鉴权、
+	# 可 eval 任意 GDScript 的本地 TCP 服务（RCE 风险）。
+	if not OS.is_debug_build():
+		set_process(false)
+		print("McpInteractionServer: release build, MCP server disabled.")
+		return
 	# Ensure MCP server keeps processing even when game is paused
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_init_key_map()

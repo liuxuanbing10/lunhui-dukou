@@ -6,4 +6,8 @@
     <Nullable>enable</Nullable>
     <AssemblyName>LunhuiDukou</AssemblyName>
   </PropertyGroup>
+  <!-- 排除独立测试工程（xunit，引 xunit 程序集），避免被主工程 glob 误编译 -->
+  <ItemGroup>
+    <Compile Remove="tests/**/*.cs" />
+  </ItemGroup>
 </Project>

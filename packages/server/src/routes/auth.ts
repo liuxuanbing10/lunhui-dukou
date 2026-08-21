@@ -7,19 +7,13 @@
 import { z } from 'zod';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { registerPlayer, authenticatePlayer } from '../services/auth-service.js';
-import { AppError } from '../utils/app-error.js';
+import { toHttpError } from '../utils/http-error.js';
 import { rateLimit } from '../services/rate-limiter.js';
 
 const Credentials = z.object({
   username: z.string().min(1, 'username 必填'),
   password: z.string().min(1, 'password 必填'),
 });
-
-const ERROR_HTTP: Record<string, number> = {
-  USERNAME_TAKEN: 409,
-  USERNAME_INVALID: 400,
-  WEAK_PASSWORD: 400,
-};
 
 function loginRateMax(): number {
   return Number(process.env.RATE_LIMIT_LOGIN_MAX ?? '5');
@@ -38,13 +32,18 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
     async (req: FastifyRequest<{ Body: CredentialsBody }>, reply: FastifyReply) => {
       const { username, password } = req.body;
       try {
-        const id = registerPlayer(app.db, username, password);
+        // 按 IP 限流：防批量注册拖垮事件循环（scrypt 异步化后仍防账号灌库）
+        if (!rateLimit(`register:${req.ip}`, loginRateMax(), loginRateWindow())) {
+          return reply
+            .code(429)
+            .send({ error: { code: 'RATE_LIMITED', message: '尝试过于频繁，请稍后再试' } });
+        }
+        const id = await registerPlayer(app.db, username, password);
         const token = app.jwt.sign({ sub: String(id), username });
         return { playerId: id, username, token };
       } catch (err) {
-        const e = err instanceof AppError ? err : new AppError('UNKNOWN');
-        const http = ERROR_HTTP[e.code] ?? 500;
-        return reply.code(http).send({ error: { code: e.code, message: e.code } });
+        const e = toHttpError(err);
+        return reply.code(e.http).send({ error: { code: e.code, message: e.message } });
       }
     },
   );
@@ -61,7 +60,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
           .code(429)
           .send({ error: { code: 'RATE_LIMITED', message: '尝试过于频繁，请稍后再试' } });
       }
-      const player = authenticatePlayer(app.db, username, password);
+      const player = await authenticatePlayer(app.db, username, password);
       if (!player) {
         return reply
           .code(401)

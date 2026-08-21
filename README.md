@@ -17,10 +17,10 @@
 ```
 lunhui-dukou/
 ├── docs/                # 项目宪法（权威文档+DESKTOP_MIGRATION+FUTURE_VISION）
+├── app/                 # Godot 4.8 mono(C#) 桌面客户端（演出层，替代原 web）
 ├── packages/
 │   ├── engine/          # AI 生成引擎（真相表/记忆/关系网/事件）
-│   ├── server/          # Fastify API（云端：审问/轮回/记忆/账号隔离）
-│   └── client/          # Godot 桌面客户端（表演层，替代原 web）
+│   └── server/          # Fastify API（云端：审问/轮回/记忆/账号隔离）
 └── README.md
 ```
 

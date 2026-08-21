@@ -18,24 +18,9 @@ import type {
   FastifyRequest,
   FastifyReply,
 } from 'fastify';
-import { AppError } from '../utils/app-error.js';
+import { toHttpError } from '../utils/http-error.js';
 import { registerAuthRoutes } from './auth.js';
 import { registerEventsStream } from './events-stream.js';
-
-const ERROR_HTTP: Record<string, number> = {
-  NO_QUESTIONS_LEFT: 403,
-  LOOP_NOT_FOUND: 404,
-  RESIDENT_NOT_ACTIVE: 404,
-  LOOP_ENDED: 409,
-  RATE_LIMITED: 429,
-};
-
-function toError(err: unknown): { code: string; message: string; http: number } {
-  const code =
-    err instanceof AppError ? err.code : err instanceof Error ? err.message : 'UNKNOWN';
-  const http = ERROR_HTTP[code] ?? 500;
-  return { code, message: code, http };
-}
 
 // ---- Zod Schemas ----
 
@@ -92,7 +77,7 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       try {
         return await askQuestion(app.db, req.playerId, loop_id, resident_id, question);
       } catch (err) {
-        const e = toError(err);
+        const e = toHttpError(err);
         return reply.code(e.http).send({ error: { code: e.code, message: e.message } });
       }
     },
@@ -110,7 +95,7 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       try {
         return makeChoice(app.db, req.playerId, loopId, req.body.choice);
       } catch (err) {
-        const e = toError(err);
+        const e = toHttpError(err);
         return reply.code(e.http).send({ error: { code: e.code, message: e.message } });
       }
     },

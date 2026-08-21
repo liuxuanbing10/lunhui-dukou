@@ -19,38 +19,39 @@ beforeEach(() => {
 });
 
 describe('auth-service', () => {
-  it('密码散列：可验证、同密码不同盐碰撞不同', () => {
-    const h1 = hashPassword('secret123');
-    const h2 = hashPassword('secret123');
+  it('密码散列：可验证、同密码不同盐碰撞不同', async () => {
+    const h1 = await hashPassword('secret123');
+    const h2 = await hashPassword('secret123');
     expect(h1).not.toBe(h2);
-    expect(verifyPassword('secret123', h1)).toBe(true);
-    expect(verifyPassword('wrong', h1)).toBe(false);
+    await expect(verifyPassword('secret123', h1)).resolves.toBe(true);
+    await expect(verifyPassword('wrong', h1)).resolves.toBe(false);
   });
 
-  it('注册成功 → 可用 authenticatePlayer 登录', () => {
-    const id = registerPlayer(db, 'alice', 'secret123');
+  it('注册成功 → 可用 authenticatePlayer 登录', async () => {
+    const id = await registerPlayer(db, 'alice', 'secret123');
     expect(id).toBeGreaterThan(0);
-    const player = authenticatePlayer(db, 'alice', 'secret123');
+    const player = await authenticatePlayer(db, 'alice', 'secret123');
     expect(player?.id).toBe(id);
-    expect(authenticatePlayer(db, 'alice', 'wrong')).toBeUndefined();
+    await expect(authenticatePlayer(db, 'alice', 'wrong')).resolves.toBeUndefined();
   });
 
-  it('注册：用户名太弱 → USERNAME_INVALID', () => {
-    expect(() => registerPlayer(db, '  ', 'secret123')).toThrowError(/^USERNAME_INVALID$/);
+  it('注册：用户名太弱 → USERNAME_INVALID', async () => {
+    await expect(registerPlayer(db, '  ', 'secret123')).rejects.toMatchObject({
+      code: 'USERNAME_INVALID',
+    });
   });
 
-  it('注册：密码过短 → WEAK_PASSWORD', () => {
-    expect(() => registerPlayer(db, 'bob', '123')).toThrowError(/^WEAK_PASSWORD$/);
+  it('注册：密码过短 → WEAK_PASSWORD', async () => {
+    await expect(registerPlayer(db, 'bob', '123')).rejects.toMatchObject({
+      code: 'WEAK_PASSWORD',
+    });
   });
 
-  it('注册：用户名重复 → USERNAME_TAKEN（AppError）', () => {
-    registerPlayer(db, 'carol', 'secret123');
-    try {
-      registerPlayer(db, 'carol', 'secret123');
-      throw new Error('should throw');
-    } catch (err) {
-      expect(err).toBeInstanceOf(AppError);
-      expect((err as AppError).code).toBe('USERNAME_TAKEN');
-    }
+  it('注册：用户名重复 → USERNAME_TAKEN（AppError）', async () => {
+    await registerPlayer(db, 'carol', 'secret123');
+    await expect(registerPlayer(db, 'carol', 'secret123')).rejects.toBeInstanceOf(AppError);
+    await expect(registerPlayer(db, 'carol', 'secret123')).rejects.toMatchObject({
+      code: 'USERNAME_TAKEN',
+    });
   });
 });

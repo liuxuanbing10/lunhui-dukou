@@ -184,10 +184,10 @@ export function addEvent(
   ).run(playerId, loopId, type, content, isClue ? 1 : 0, isTrap ? 1 : 0);
 }
 
-export function getEvents(db: Database, loopId: number): EventRow[] {
+export function getEvents(db: Database, playerId: number, loopId: number): EventRow[] {
   return db
-    .prepare('SELECT * FROM events WHERE loop_id = ? ORDER BY id')
-    .all(loopId) as EventRow[];
+    .prepare('SELECT * FROM events WHERE loop_id = ? AND player_id = ? ORDER BY id')
+    .all(loopId, playerId) as EventRow[];
 }
 
 // ---------- questions（按玩家隔离） ----------

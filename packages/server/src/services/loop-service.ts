@@ -102,19 +102,21 @@ export function startNewLoop(db: Database, playerId: number): NewLoopOutcome {
   // 轮回重置：非永久记忆衰减（仅本玩家）
   if (sequence > 1) decayMemories(db, playerId);
 
-  const loopId = createLoop(db, playerId, sequence);
+  // 开场写库事务化：loop + 事件 + 世界快照要么全部落库、要么全部回滚，避免半状态
   const residents = getAllResidents(db);
   const activeResidents = residents.map((r) => r.id);
+  const insertLoop = db.transaction(() => {
+    const loopId = createLoop(db, playerId, sequence);
+    addEvent(db, playerId, loopId, 'plot', INTRO, false, false);
+    for (const r of residents.slice(0, 3)) {
+      addEvent(db, playerId, loopId, 'ambient', `${r.name}在镇上。`, false, false);
+    }
+    saveWorldState(db, playerId, loopId, [], { started: true }, activeResidents);
+    return loopId;
+  });
+  const loopId = insertLoop();
 
-  // 开场事件 + 实时推送（WebSocket 流）
-  addEvent(db, playerId, loopId, 'plot', INTRO, false, false);
-  for (const r of residents.slice(0, 3)) {
-    addEvent(db, playerId, loopId, 'ambient', `${r.name}在镇上。`, false, false);
-  }
-
-  saveWorldState(db, playerId, loopId, [], { started: true }, activeResidents);
-
-  const events = getEvents(db, loopId);
+  const events = getEvents(db, playerId, loopId);
   // 事件已落库，再经 broker 实时推给该玩家的 WebSocket 订阅
   for (const ev of events) publishEvent(playerId, ev);
 
@@ -173,15 +175,18 @@ export async function askQuestion(
     result.usedLlm,
   );
 
-  // 关键命中 → 写入记忆（世界记得你）
-  if (result.hitFactId) {
-    const fact = resident.secretFacts.facts.find((f) => f.id === result.hitFactId);
-    if (fact) {
-      addMemory(db, playerId, residentId, loopId, `${resident.name}提到：${fact.statement}`, false);
+  // 关键命中 → 写入记忆（世界记得你）。问句落库 + 记忆写入包进事务，避免 question 已写而 memory 未写的半状态。
+  db.transaction(() => {
+    if (result.hitFactId) {
+      const fact = resident.secretFacts.facts.find((f) => f.id === result.hitFactId);
+      if (fact) {
+        addMemory(db, playerId, residentId, loopId, `${resident.name}提到：${fact.statement}`, false);
+      }
     }
-  }
+  })();
 
-  const left = MAX_QUESTIONS - countQuestionsInLoop(db, playerId, loopId);
+  // 结尾不再重复查询：本次已必然扣除 1 问（同玩家并发由单玩家限流 + 下次额度 gate 兜底）
+  const left = MAX_QUESTIONS - asked - 1;
   return {
     loopId,
     sequence: loop.sequence,
