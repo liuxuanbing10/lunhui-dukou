@@ -18,8 +18,8 @@ public partial class Main : Node3D
     private ServerClient? _server;
     private Session? _session; // null=未登录（走本地兜底）
 
-    // 世界节点
-    private Node3D? _resident;
+    // 当前被审问的居民（r1..r8）
+    private string _residentId = GameLogic.All[0].Id;
 
     // 显示状态
     private int _loopSeq = 1;
@@ -34,6 +34,7 @@ public partial class Main : Node3D
 
     private Label? _header;
     private Label? _narrator;
+    private OptionButton? _residentSel;
     private LineEdit? _input;
     private Button? _askBtn;
     private HBoxContainer? _choiceBox;
@@ -54,6 +55,11 @@ public partial class Main : Node3D
             RunSmokeAsync(); // 无头端到端验证（CI），完成后自动退出
             return;
         }
+        if (OS.GetEnvironment("LUNHUI_TEST_SESSION") == "1")
+        {
+            RunSessionCheck(); // 存档版本迁移自检
+            return;
+        }
 
         // 有存量会话则直接进入，否则先登录/注册
         if (_session is { Token.Length: > 0 })
@@ -63,8 +69,6 @@ public partial class Main : Node3D
     }
 
     // ---------- 云端/E2E ----------
-    private static string BaseUrlFrom(Session s) => s.BaseUrl;
-
     // 无头端到端冒烟：注册→开局→审问命中 f1→退出。失败退出码 1。
     private async void RunSmokeAsync()
     {
@@ -79,8 +83,11 @@ public partial class Main : Node3D
             var loop = await server.StartLoopAsync(auth.Token);
             GD.Print($"[smoke] loopId={loop.LoopId} seq={loop.Sequence} left={loop.QuestionsLeft}");
             var ask = await server.AskAsync(auth.Token, loop.LoopId, "r1", "你捞过我吗？");
-            GD.Print($"[smoke] answer='{ask.Answer}' mode={ask.AnswerMode} pause={ask.Pause} left={ask.QuestionsLeft}");
-            if (ask.Pause && ask.AnswerMode == "direct" && ask.QuestionsLeft == 9)
+            GD.Print($"[smoke] r1 answer='{ask.Answer}' mode={ask.AnswerMode} pause={ask.Pause} left={ask.QuestionsLeft}");
+            var ask2 = await server.AskAsync(auth.Token, loop.LoopId, "r8", "你怎么知道我的名字？");
+            GD.Print($"[smoke] r8 answer='{ask2.Answer}' mode={ask2.AnswerMode} pause={ask2.Pause}");
+            if (ask.Pause && ask.AnswerMode == "direct" && ask.QuestionsLeft == 9
+                && ask2.Pause && !string.IsNullOrEmpty(ask2.Answer))
             {
                 GD.Print("SMOKE_PASS");
                 GetTree().Quit(0);
@@ -96,6 +103,21 @@ public partial class Main : Node3D
             GD.PrintErr($"[smoke] ERROR: {e.Message}");
             GetTree().Quit(1);
         }
+    }
+
+    // 存档版本迁移自检：写入无 version 的旧格式 → Load 应迁移到当前版本（跑完即退）。
+    private void RunSessionCheck()
+    {
+        SessionStore.Clear();
+        using (var f = FileAccess.Open("user://session.json", FileAccess.ModeFlags.Write))
+            f.StoreString("{\"BaseUrl\":\"\",\"Token\":\"legacy\",\"PlayerId\":7,\"Username\":\"u\",\"LoopId\":5}");
+        var loaded = SessionStore.Load();
+        bool ok = loaded != null
+            && loaded.Version == SessionStore.CurrentVersion
+            && loaded.Token == "legacy"
+            && loaded.BaseUrl == "http://127.0.0.1:8787";
+        GD.Print(ok ? "SESSION_MIGRATE_PASS" : "SESSION_MIGRATE_FAIL");
+        GetTree().Quit(ok ? 0 : 1);
     }
 
     // ---------- 3D 世界 ----------
@@ -123,31 +145,40 @@ public partial class Main : Node3D
         AddChild(camera);
         camera.LookAtFromPosition(new Vector3(0, 6, 14), new Vector3(0, 0, 0), Vector3.Up);
 
-        _resident = new Node3D { Position = new Vector3(0, 0, 2.4f) };
-        var mesh = new MeshInstance3D
+        // 8 位居民占位立绘（Phase 3②；真模型在 Phase 2 用 Blender 产出接入）
+        // 沿河街排成略弧的一排，颜色按角色区分；小满(r8)最矮。
+        for (int i = 0; i < GameLogic.All.Length; i++)
         {
-            Mesh = new CapsuleMesh { Radius = 0.32f, Height = 1.7f },
-            Position = new Vector3(0, 0.85f, 0),
-        };
-        mesh.MaterialOverride = new StandardMaterial3D
-        {
-            AlbedoColor = new Color(0.16f, 0.26f, 0.22f),
-            Roughness = 0.9f,
-        };
-        _resident.AddChild(mesh);
-
-        var hat = new MeshInstance3D
-        {
-            Mesh = new CylinderMesh { TopRadius = 0.42f, BottomRadius = 0.42f, Height = 0.12f },
-            Position = new Vector3(0, 1.72f, 0),
-        };
-        hat.MaterialOverride = new StandardMaterial3D
-        {
-            AlbedoColor = new Color(0.13f, 0.2f, 0.17f),
-            Roughness = 0.95f,
-        };
-        _resident.AddChild(hat);
-        AddChild(_resident);
+            float childScale = GameLogic.All[i].Id == "r8" ? 0.62f : 1f;
+            var node = new Node3D
+            {
+                Position = new Vector3((i - 3.5f) * 1.7f, 0, 2.6f + (i % 2) * 0.4f),
+                Scale = new Vector3(childScale, childScale, childScale),
+            };
+            var body = new MeshInstance3D
+            {
+                Mesh = new CapsuleMesh { Radius = 0.32f, Height = 1.6f },
+                Position = new Vector3(0, 0.8f, 0),
+            };
+            body.MaterialOverride = new StandardMaterial3D
+            {
+                AlbedoColor = Color.FromHtml(new[] { "#2E4A3F", "#9A6B4F", "#D8B46A", "#6E4B3A", "#5C6B73", "#6E5A3E", "#4A5A6B", "#7A8B6E" }[i]!),
+                Roughness = 0.9f,
+            };
+            node.AddChild(body);
+            var hat = new MeshInstance3D
+            {
+                Mesh = new CylinderMesh { TopRadius = 0.4f, BottomRadius = 0.4f, Height = 0.12f },
+                Position = new Vector3(0, 1.62f, 0),
+            };
+            hat.MaterialOverride = new StandardMaterial3D
+            {
+                AlbedoColor = new Color(0.13f, 0.2f, 0.17f),
+                Roughness = 0.95f,
+            };
+            node.AddChild(hat);
+            AddChild(node);
+        }
 
         _TryAddRain();
     }
@@ -249,11 +280,21 @@ public partial class Main : Node3D
         };
         outer.AddChild(_narrator);
 
+        // 向谁问：8 位居民选择器
+        var selRow = new HBoxContainer { Name = "SelRow" };
+        selRow.AddChild(new Label { Text = "向谁问：" });
+        _residentSel = new OptionButton { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        for (int i = 0; i < GameLogic.All.Length; i++)
+            _residentSel.AddItem($"{GameLogic.All[i].Name}");
+        _residentSel.ItemSelected += idx => _residentId = GameLogic.All[(int)idx].Id;
+        selRow.AddChild(_residentSel);
+        outer.AddChild(selRow);
+
         var inputRow = new HBoxContainer { Name = "InputRow" };
         _input = new LineEdit
         {
             Name = "AskInput",
-            PlaceholderText = "问蓑衣人一句话（试试：你捞过我吗？）",
+            PlaceholderText = "问一句，看看能不能套出真相（如「你捞过我吗？」）",
             SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
         };
         _askBtn = new Button { Name = "AskBtn", Text = "开口问" };
@@ -333,7 +374,8 @@ public partial class Main : Node3D
 
     private void SaveSession(AuthResult auth, int loopId)
     {
-        _session = new Session(BaseUrlFrom(_session ?? new Session(DefaultBaseUrl, "", 0, "", 0)), auth.Token, auth.PlayerId, auth.Username, loopId);
+        var baseUrl = _session?.BaseUrl ?? DefaultBaseUrl;
+        _session = new Session(baseUrl, auth.Token, auth.PlayerId, auth.Username, loopId, SessionStore.CurrentVersion);
         SessionStore.Save(_session);
     }
 
@@ -401,12 +443,12 @@ public partial class Main : Node3D
         _input.Editable = false;
         _input.Text = "";
 
-        // 在线：真实回合；离线：本地真相表
+        // 在线：真实回合；离线：本地真相表（均可选 8 位居民任意审问）
         if (_session is { Token.Length: > 0 })
         {
             try
             {
-                var res = await _server!.AskAsync(_session.Token, _session.LoopId, "r1", q);
+                var res = await _server!.AskAsync(_session.Token, _session.LoopId, _residentId, q);
                 _left = res.QuestionsLeft;
                 RefreshHeader();
                 await PlayAnswerAsync(res.Answer, res.Pause);
@@ -417,7 +459,7 @@ public partial class Main : Node3D
                 GD.PushWarning($"[main] 审问失败转本地兜底: {e.Message}");
             }
         }
-        var local = _logic.Ask(q);
+        var local = _logic.Ask(_residentId, q);
         _left = _logic.QuestionsLeft;
         RefreshHeader();
         await PlayAnswerAsync(local.Text, local.Pause);

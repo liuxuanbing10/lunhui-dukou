@@ -6,6 +6,27 @@
 
 ---
 
+## 2026-08-21 · 桌面化 Phase 3②：客户端接入 8 居民真相表 + 会话迁移
+
+**本次内容**：
+1. **GameLogic 扩到 8 位居民**（离线兜底真相表）：按各 SOUL SecretFacts 接入 r1..r8 关键事实/关键词；每条关键事实配第一人称点睛台词 + 命中→沉默三秒并写记忆；未命中走逐角色兜底台词。
+2. **Main.cs**：新增"向谁问"居民选择器（OptionButton 选 8 人）；场景渲染 8 位占位居民（沿河街一排、按角色配色、小满最矮）；在线 `AskAsync`/离线 `GameLogic.Ask` 均传所选 resident_id。
+3. **Session 版本迁移**：`Session` 加 `version`；`SessionStore.Load` 对旧存档（无 version，Phase 3① 产物）自动迁移并回写；新增 `LUNHUI_TEST_SESSION=1` 无头自检。
+
+**验证**：
+- `dotnet build` 0 错误；
+- 8 居民离线自测 15/15 通过（8 人各命中关键事实→pause、记忆归属正确、未命中兜底、额度用尽 deny、轮回重置）；
+- 存档迁移无头自检 `SESSION_MIGRATE_PASS`（旧无 version JSON → version=1 + baseUrl 回填）；
+- 起 server + `LUNHUI_SMOKE=1` E2E `SMOKE_PASS`：r1（捞过你→pause）与 r8（小满·知道每世名字→pause）均云端命中真相表。
+
+**坑**：
+- 手改 Main.cs 时两度误删方法签名（`RunSmokeAsync`/`_BuildWorld`）致函数体孤立——编辑多行方法时要整段替换或核对签名；
+- `GameLogic.FirstOrDefault` 需显式 `using System.Linq;`（项目未开 ImplicitUsings）。
+
+**下一步**：Phase 2 演出细化（四相位/真模型立绘/雨与镜头/音频）；G1 决策门待你 GUI 实测。
+
+---
+
 ## 2026-08-21 · 桌面化 Phase 3①：Godot 客户端接云端（登录/鉴权 + 真实回合 + 断网兜底）
 
 **本次内容**：把 app/ 客户端从"本地真相表挂钩"升级为"接 @lunhui/server 真实回合"，并加登录/注册(JWT)与本地会话存档。
