@@ -6,6 +6,18 @@
 
 ---
 
+## 2026-08-21 · godot-mcp 换装后首测：运行时深检通过 + 修补 6 处脚本告警
+
+**验证（新 stdio server）**：`get_project_info`（轮回渡口/4.8dev3/C#）、`get_godot_version`、无头 `read_scene` 读 Main.tscn 全通；`run_project` 拉起游戏后用 `game_get_scene_tree` 确认**运行时世界完整**（8 位居民、三船/hull/canopy/lamp、河岸、雨/暖声、相机、登录 UI）；`get_debug_output`/`stop_project` 正常。
+
+**完善**：修 `app/scripts/tools/mcp_interaction_server.gd` 6 处告警——3 处 `for name in` 遮蔽 Node.name（改 `key`），2 处整数当枚举（`mode_val as Input.MouseMode` / `as Node.ProcessMode`，注意 GDScript 枚举不能用构造函数）。改后无头复验：`shadowing=0 enumwarn=0 errors=0 autoload_ok=True`。
+
+**运行期观察（非缺陷）**：`Main.cs:588` 后端不可达→本地兜底（预期行为）；`libpng iCCP sRGB` 告警来自资源元数据（装饰性，未修）。
+
+**教训**：GDScript 里把 int 转枚举用 `x as EnumType`，用 `EnumType(x)` 构造会报 `Name "X" called as a function but is a "Enum."`。
+
+---
+
 ## 2026-08-21 · 换用 tugcantopaloglu/godot-mcp（157 工具）：TraeWork + 项目双侧配置
 
 **背景**：原 DaxianLee 版 godot-mcp（编辑器内 addon，HTTP:3000）在 Godot 4.8-dev3 上编辑器级工具全部 `Editor interface not available`（addon↔dev 版不兼容，R1 风险）。换用 **tugcantopaloglu/godot-mcp**（TypeScript stdio server，157 工具，含无头场景操作 + 运行时 game_*）。
