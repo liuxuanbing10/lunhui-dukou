@@ -1,0 +1,8 @@
+# Godot 生成物（不入库）
+.godot/
+android/
+
+# .NET 构建产物
+bin/
+obj/
+*.user

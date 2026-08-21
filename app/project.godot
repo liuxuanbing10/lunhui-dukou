@@ -1,0 +1,28 @@
+; Engine configuration file.
+; 轮回渡口 —— Godot 桌面客户端（Phase 0 垂直切片，见 docs/DESKTOP_MIGRATION.md）
+; 由 Godot 编辑器打开本目录（app/）直接运行。
+
+config_version=5
+
+[application]
+
+config/name="轮回渡口"
+config/description="第一个由 AI 实时生成剧情、且每个玩家故事真正分叉的推理互动叙事"
+config/features=PackedStringArray("4.8", "C#", "GL Compatibility")
+run/main_scene="res://scenes/Main.tscn"
+
+[dotnet]
+
+project/assembly_name="LunhuiDukou"
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/stretch/mode="canvas_items"
+window/stretch/aspect="keep"
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"

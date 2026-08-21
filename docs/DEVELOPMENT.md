@@ -83,3 +83,22 @@ npm run lint && npm run typecheck && npm run test && npm run build
 | esbuild 二进制报错 | install script 被拦 | `npm install-scripts approve esbuild` |
 | 8787 端口被占 | 残留 tsx 子进程 | 按 §7 端口清理 |
 | import 报 TS2835 | NodeNext 需显式扩展名 | 用 `./x.js` 导入 |
+
+## 9. Godot 桌面客户端（`app/`，Phase 0 垂直切片）
+
+> 桌面客户端为 C#（mono）。本机工具链：`D:\tools\Godot_v4.8-dev3_mono_win64` + .NET SDK。
+> `app/` 已配本地 NuGet 源指向编辑器自带 `Godot.NET.Sdk 4.8.0-dev.3`（dev 版不上 nuget.org）。
+
+- **打开工程**（日常开发）：Godot 编辑器 → 导入 `app/`，按 F5 运行。
+- **构建 C#**：
+  ```bash
+  dotnet build app/LunhuiDukou.csproj
+  ```
+- **导入/重导资产**（首次或新增 glb 后必做）：
+  - Godot 编辑器打开一次即自动导入；
+  - 或命令行：`D:\tools\Godot_v4.8-dev3_mono_win64\Godot_v4.8-dev3_mono_win64.exe --headless --path app --import`
+- **无头冒烟运行**（CI 用，跑 90 帧自动退出）：
+  ```bash
+  Godot_v4.8-dev3_mono_win64.exe --headless --path app --quit-after 90
+  ```
+- **提交注意**：`app/.godot`、`app/bin`、`app/obj` 已被 `app/.gitignore` 排除，不入库；`*.import` 元数据需入库。

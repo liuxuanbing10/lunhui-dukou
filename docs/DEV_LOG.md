@@ -6,6 +6,25 @@
 
 ---
 
+## 2026-08-21 · 桌面化 Phase 0：建成 Godot 桌面工程（app/）+ 垂直切片跑通
+
+**本次内容**：把项目"变成 Godot 项目"——新建 `app/` 桌面客户端（C#/mono），跑通单居民 r1 垂直闭环。
+1. **工程骨架**：`app/project.godot`（窗口 1280×720、GL Compatibility、主场景 Main.tscn）、`LunhuiDukou.csproj`（Godot.NET.Sdk 4.8.0-dev.3）、`NuGet.Config`（本地源指向编辑器自带 dev SDK，因 4.8.0-dev.3 不上 nuget.org）、`app/.gitignore`（排除 `.godot/ bin/ obj/`）。
+2. **资产**：`dukou.glb`（渡口小雨镇）从 web 资产同源复制进 `app/assets/scene/`，经 `--headless --import` 导入（104 步）。
+3. **纯逻辑层** `GameLogic.cs`：r1 蓑衣人本地真相表（f1 捞过你→沉默三秒+记忆 / f2 不揭底 / f3）+ 10 问额度 + 轮回状态——即迁移方案"本地预计算挂钩"（先不接 server）。
+4. **场景+UI 层** `Main.cs`：运行时装配雨夜空镜（glb + 夜景方向光 + 相机 LookAtFromPosition）+ 蓑衣人占位（深青胶囊+斗笠）+ 雨 GPUParticles + 中文对话题（SystemFont·微软雅黑）；状态机 开场→提问→沉默三秒→选择(上船/留下)→死亡→轮回重启(第 N 世+记忆保留)。
+
+**验证**：`dotnet build` 0 错误；`godot --headless --path app --quit-after 90` 干净退出无报错；`GameLogic` 独立控制台断言 9/9 通过（f1 沉默/额度耗尽 deny/轮回重置/记忆保留）；临时自测工程已删。
+
+**坑**：
+- `Camera3D.LookAt` 在节点入树前调用 → "Node not inside tree"，改用 `LookAtFromPosition`；
+- `SystemFont` 无 `FontSize` 属性，字号改由 `Theme.DefaultFontSize` 统一设置；
+- 4.8.0-dev.3 是 dev 版，只存在于编辑器自带 nupkgs，必须配本地 NuGet 源才能还原。
+
+**下一步**：GUI 打开 `app/` 实测垂直切片可玩（过 G1 稳定关）；Phase 2 演出层细化（真模型/立绘/四相位/音频）；server 会话化接入（替换本地挂钩）。
+
+---
+
 ## 2026-08-21 · 桌面化 Phase 1：server 云端化改造（账号/隔离/限流/WebSocket）
 
 **本次内容**：按 DESKTOP_MIGRATION.md Phase 1，把 server 从"单机无鉴权"升级为"可服务多玩家桌面的云端后端"——四件套全做完。
