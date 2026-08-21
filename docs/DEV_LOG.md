@@ -6,6 +6,26 @@
 
 ---
 
+## 2026-08-21 · 换用 tugcantopaloglu/godot-mcp（157 工具）：TraeWork + 项目双侧配置
+
+**背景**：原 DaxianLee 版 godot-mcp（编辑器内 addon，HTTP:3000）在 Godot 4.8-dev3 上编辑器级工具全部 `Editor interface not available`（addon↔dev 版不兼容，R1 风险）。换用 **tugcantopaloglu/godot-mcp**（TypeScript stdio server，157 工具，含无头场景操作 + 运行时 game_*）。
+
+**做法**：
+1. `git clone` 到 `D:\tools\godot-mcp-full` → `npm install && npm run build`（产出 `build/index.js` + `build/scripts/*.gd`）。
+2. **项目侧**：把 `mcp_interaction_server.gd`（运行时 TCP server，9090）放进 `app/scripts/tools/`（会提交，可复现），`project.godot` 注册 autoload `McpInteractionServer`；移除旧 DaxianLee addon 与其 `[editor_plugins]`。
+3. **TraeWork/IDE 侧**：`%APPDATA%\Trae CN\User\mcp.json` 与 `TRAE SOLO CN\User\mcp.json` 的 `godot-mcp` 项由 `url:http://127.0.0.1:3000/mcp` 改为 stdio：
+   `node D:\tools\godot-mcp-full\build\index.js` + `env{GODOT_PATH, DEBUG}`。
+
+**验证**：无头运行 autoload 监听 **9090** 正常；server `node build/index.js` 注入 `GODOT_PATH` 后正确识别 Godot 4.8 exe 并 `running on stdio`；`dotnet build`/import/smoke 无回归。
+
+**坑**：
+- Trae 的 mcp.json 是用户系统配置（编辑工具只允许工作目录内），需用 PowerShell `ConvertFrom-Json/ConvertTo-Json` 改；`-Depth` 设大（30）避免"超过深度被截断"告警；改完需 **Trae 重载/重启 MCP** 才生效。
+- 移除旧 addon 时其位于 gitignored `addons/`，不影响 git。
+
+**下一步**：Trae 重载后确认新 godot-mcp 工具可用（`get_project_info`/`run_project` 等）；运行时 game_* 需在游戏运行时通过 autoload 的 9090。
+
+---
+
 ## 2026-08-21 · godot-mcp 编辑器深控受限 —— R1 风险实锤（4.8-dev3 不注册 EditorInterface 单例）
 
 **现象**：即便只保留一个干净 GUI 编辑器（`godot --editor --path app`，插件加载、MCP server 起在 3000、注册 74 工具），`scene_management`/`editor_status`/`scene_hierarchy` 等编辑器级工具仍统一返回 `Editor interface not available`；仅 `project_info`/`get_features` 等非编辑器级可用。
